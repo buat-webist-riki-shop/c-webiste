@@ -1,3 +1,5 @@
+// public/script.js
+
 document.addEventListener('DOMContentLoaded', () => {
     // Tandai waktu mulai saat script pertama kali dijalankan
     const startTime = performance.now();
@@ -38,7 +40,7 @@ document.addEventListener('DOMContentLoaded', () => {
         toast.className = '';
         toast.classList.add(type);
         toast.classList.add('show');
-        toastTimeout = setTimeout(() => { toast.classList.remove('show'); }, 4000); // Durasi toast diperpanjang
+        toastTimeout = setTimeout(() => { toast.classList.remove('show'); }, 4000);
     };
 
     const applyTheme = (theme) => {
@@ -124,19 +126,30 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
+    // --- MODIFIKASI KUNCI: Menambahkan batas waktu (timeout) pada fungsi ini ---
     const fetchDomains = async () => {
-        try {
-            // MODIFIKASI: Path disesuaikan, seharusnya cukup /api/create-website
-            const response = await fetch('/api/create-website');
-            if (!response.ok) throw new Error('Gagal memuat domain');
-            const domains = await response.json();
+        // Buat AbortController untuk membatalkan fetch jika terlalu lama
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 8000); // Batas waktu 8 detik
 
+        try {
+            const response = await fetch('/api/create-website', {
+                signal: controller.signal // Kaitkan sinyal abort ke fetch
+            });
+            clearTimeout(timeoutId); // Batalkan timeout jika fetch berhasil
+
+            if (!response.ok) {
+                const errorResult = await response.json();
+                throw new Error(errorResult.message || 'Gagal memuat domain dari server.');
+            }
+            
+            const domains = await response.json();
             rootDomainSelect.innerHTML = '';
             if (domains.length > 0) {
                 domains.forEach(domain => {
                     const option = document.createElement('option');
                     option.value = domain;
-                    option.textContent = domain; // Tampilkan nama domain lengkap
+                    option.textContent = domain;
                     rootDomainSelect.appendChild(option);
                 });
             } else {
@@ -145,7 +158,12 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         } catch (error) {
             console.error(error);
-            rootDomainSelect.innerHTML = '<option value="">Error memuat</option>';
+            rootDomainSelect.innerHTML = '<option value="">Gagal memuat domain</option>';
+            // Beri pesan error yang jelas kepada pengguna
+            if (error.name === 'AbortError') {
+                throw new Error('Server tidak merespons. Gagal memuat daftar domain.');
+            }
+            throw error; // Lemparkan error lainnya
         }
     };
     
@@ -279,7 +297,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const result = await response.json();
             if (!response.ok) throw new Error(result.message);
             
-            let finalStatus = result.status; // 'success' or 'pending'
+            let finalStatus = result.status;
             const updatedSite = updateSiteStatus(project, finalStatus);
             if(updatedSite) updateModalStatus(updatedSite.status);
             
@@ -288,7 +306,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
         } catch (error) {
             showToast(error.message, 'error');
-            // Jika error, kembalikan status ke pending agar bisa dicek lagi
             updateModalStatus('pending');
         }
     });
@@ -303,10 +320,9 @@ document.addEventListener('DOMContentLoaded', () => {
             await fetchDomains();
         } catch(error) {
             console.error("Inisialisasi gagal:", error);
-            showToast("Gagal memuat komponen halaman.", "error");
+            showToast(error.message, "error");
         } finally {
-            // MODIFIKASI: Logika loading screen dipindah ke 'finally'
-            const minimumLoadingTime = 500;
+            const minimumLoadingTime = 300;
             const elapsedTime = performance.now() - startTime;
             const remainingTime = minimumLoadingTime - elapsedTime;
 

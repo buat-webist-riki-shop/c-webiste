@@ -8,7 +8,7 @@ import { promises as dns } from 'dns';
 
 // --- Solusi Permanen: Import data domain langsung ---
 // Ini memastikan Vercel selalu menyertakan file domains.json dalam build.
-import domainsData from '../data/domains.json' assert { type: 'json' };
+import domainsData from './data/domains.json' assert { type: 'json' };
 
 // --- Konfigurasi ---
 const GITHUB_TOKEN = process.env.GITHUB_TOKEN;

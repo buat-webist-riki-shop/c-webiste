@@ -9,7 +9,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const fileNameSpan = document.getElementById('file-name-span');
     const userApiKeyInput = document.getElementById('user-api-key');
     const createBtn = document.getElementById('create-btn');
-    const btnText = document.getElementById('btn-text');
     const sitesContainer = document.getElementById('created-sites-container');
     const sitesList = document.getElementById('sites-list');
     const subdomainStatus = document.getElementById('subdomain-status');

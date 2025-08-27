@@ -1,4 +1,6 @@
 document.addEventListener('DOMContentLoaded', () => {
+    // Elemen UI
+    const loadingOverlay = document.getElementById('loading-overlay');
     const loginScreen = document.getElementById('login-screen');
     const adminPanel = document.getElementById('admin-panel');
     const passwordInput = document.getElementById('admin-password');
@@ -7,7 +9,29 @@ document.addEventListener('DOMContentLoaded', () => {
     const keyListContainer = document.getElementById('api-key-list-container');
     const permanentCheckbox = document.getElementById('permanent-key');
     const durationSection = document.getElementById('duration-section');
+    
+    // Elemen Tema
+    const themeToggle = document.getElementById('theme-toggle');
+    const body = document.body;
+    
+    // --- LOGIKA TEMA TERANG/GELAP ---
+    const applyTheme = (theme) => {
+        if (theme === 'dark') {
+            body.classList.add('dark-mode');
+            themeToggle.innerHTML = '<i class="fas fa-sun"></i>';
+        } else {
+            body.classList.remove('dark-mode');
+            themeToggle.innerHTML = '<i class="fas fa-moon"></i>';
+        }
+    };
+    
+    themeToggle.addEventListener('click', () => {
+        const newTheme = body.classList.contains('dark-mode') ? 'light' : 'dark';
+        localStorage.setItem('theme_preference_v1', newTheme);
+        applyTheme(newTheme);
+    });
 
+    // --- LOGIKA UTAMA ---
     const callApi = async (action, data = {}) => {
         const password = sessionStorage.getItem('adminPassword');
         if (!password) {
@@ -115,4 +139,22 @@ document.addEventListener('DOMContentLoaded', () => {
     permanentCheckbox.addEventListener('change', () => {
         durationSection.style.display = permanentCheckbox.checked ? 'none' : 'block';
     });
+
+    // --- INISIALISASI ---
+    const init = () => {
+        const savedTheme = localStorage.getItem('theme_preference_v1') || 'light';
+        applyTheme(savedTheme);
+
+        // Tampilkan login screen setelah 500ms agar animasi loading terlihat
+        setTimeout(() => {
+            if (sessionStorage.getItem('adminPassword')) {
+                loginBtn.click(); // Coba login otomatis jika ada sesi
+            } else {
+                loginScreen.style.display = 'block';
+            }
+            loadingOverlay.classList.add('hidden');
+        }, 500);
+    };
+    
+    init();
 });

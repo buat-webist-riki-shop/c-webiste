@@ -10,7 +10,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnText = document.getElementById('btn-text');
     const sitesContainer = document.getElementById('created-sites-container');
     const sitesList = document.getElementById('sites-list');
-    const subdomainStatus = document.getElementById('subdomain-status');
     
     // Elemen Modal
     const detailsModal = document.getElementById('details-modal');
@@ -22,21 +21,8 @@ document.addEventListener('DOMContentLoaded', () => {
     // Elemen Tema
     const themeToggle = document.getElementById('theme-toggle');
     const body = document.body;
-    let debounceTimer;
-    let toastTimeout;
 
-    // --- NOTIFIKASI & TEMA ---
-    const showToast = (message, type = 'info') => {
-        const toast = document.getElementById('toast-notification');
-        clearTimeout(toastTimeout);
-        const iconMap = { success: 'fa-check-circle', error: 'fa-times-circle', info: 'fa-info-circle' };
-        toast.innerHTML = `<i class="fas ${iconMap[type]}"></i> ${message}`;
-        toast.className = '';
-        toast.classList.add(type);
-        toast.classList.add('show');
-        toastTimeout = setTimeout(() => { toast.classList.remove('show'); }, 3000);
-    };
-
+    // --- LOGIKA TEMA TERANG/GELAP ---
     const applyTheme = (theme) => {
         if (theme === 'dark') {
             body.classList.add('dark-mode');
@@ -135,7 +121,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
             } else {
                  rootDomainSelect.innerHTML = '<option value="">Tidak ada domain</option>';
-                 showToast('Admin belum menambahkan domain utama.', 'error');
             }
         } catch (error) {
             console.error(error);
@@ -143,55 +128,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
     
-    // --- VALIDASI & INTERAKSI FORM ---
-    const checkSubdomainAvailability = async () => {
-        const subdomain = subdomainInput.value;
-        const rootDomain = rootDomainSelect.value;
-        if (!subdomain || !rootDomain) {
-            subdomainStatus.textContent = '';
-            return;
-        }
-        subdomainStatus.textContent = 'Memeriksa...';
-        subdomainStatus.className = '';
-
-        try {
-            const response = await fetch('/api/create-website', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ action: 'checkSubdomain', data: { subdomain, rootDomain } })
-            });
-            const result = await response.json();
-            if (!response.ok) throw new Error(result.message);
-
-            if (result.available) {
-                subdomainStatus.textContent = 'Tersedia';
-                subdomainStatus.className = 'available';
-            } else {
-                subdomainStatus.textContent = 'Sudah Digunakan';
-                subdomainStatus.className = 'taken';
-            }
-        } catch (error) {
-            subdomainStatus.textContent = 'Error';
-            subdomainStatus.className = 'taken';
-        }
-    };
-    
-    subdomainInput.addEventListener('input', (e) => {
-        const originalValue = e.target.value;
-        const formattedValue = originalValue.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
-        if (originalValue !== formattedValue) {
-            showToast('Hanya huruf kecil, angka, dan strip (-) yang diizinkan.', 'info');
-        }
-        e.target.value = formattedValue;
-        
-        clearTimeout(debounceTimer);
-        debounceTimer = setTimeout(() => {
-            checkSubdomainAvailability();
-        }, 500);
-    });
-    
-    rootDomainSelect.addEventListener('change', checkSubdomainAvailability);
-
+    // --- EVENT LISTENERS ---
     websiteFileInput.addEventListener('change', () => {
         fileNameSpan.textContent = websiteFileInput.files.length > 0 ? websiteFileInput.files[0].name : 'Pilih file...';
     });
@@ -199,7 +136,7 @@ document.addEventListener('DOMContentLoaded', () => {
     creatorForm.addEventListener('submit', async (e) => {
         e.preventDefault();
         if (!subdomainInput.value || !rootDomainSelect.value || !websiteFileInput.files[0] || !userApiKeyInput.value) {
-            return showToast('Harap isi semua kolom!', 'error');
+            return alert('Harap isi semua kolom!');
         }
 
         createBtn.disabled = true;
@@ -224,11 +161,9 @@ document.addEventListener('DOMContentLoaded', () => {
             showDetailsModal(result.siteData);
             creatorForm.reset();
             fileNameSpan.textContent = 'Pilih file...';
-            subdomainStatus.textContent = '';
-            showToast('Website berhasil dibuat!', 'success');
 
         } catch (error) {
-            showToast(`Gagal: ${error.message}`, 'error');
+            alert(`Gagal: ${error.message}`);
         } finally {
             createBtn.disabled = false;
             btnText.textContent = 'Buat Website';
@@ -237,11 +172,6 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     modalCloseBtn.addEventListener('click', () => detailsModal.classList.remove('show'));
-    detailsModal.addEventListener('click', (e) => {
-        if(e.target === detailsModal) {
-            detailsModal.classList.remove('show');
-        }
-    });
 
     sitesList.addEventListener('click', (e) => {
         const item = e.target.closest('.sites-list-item');
@@ -267,13 +197,12 @@ document.addEventListener('DOMContentLoaded', () => {
             const result = await response.json();
             if (!response.ok) throw new Error(result.message);
             
-            updateSiteStatus(project, result.status);
+            const updatedSite = updateSiteStatus(project, result.status);
             updateModalStatus(result.status);
             renderSitesList();
-            showToast(result.message, result.status);
 
         } catch (error) {
-            showToast(error.message, 'error');
+            alert(error.message);
             updateModalStatus('pending');
         }
     });

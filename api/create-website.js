@@ -75,7 +75,7 @@ export default async function handler(request, response) {
 // --- Logika GET ---
 async function handleGetDomains(req, res) {
     try {
-        const domainsData = JSON.parse(fs.readFileSync(path.resolve('./data/domains.json'), 'utf-8'));
+        const domainsData = JSON.parse(fs.readFileSync(path.resolve('/data/domains.json'), 'utf-8'));
         return res.status(200).json(Object.keys(domainsData));
     } catch (error) {
         return res.status(500).json({ message: "Gagal memuat daftar domain." });
@@ -266,7 +266,7 @@ async function handleCreateWebsite(request, response) {
             body: JSON.stringify({ name: finalDomain })
         });
         
-        const allDomains = JSON.parse(fs.readFileSync(path.resolve('./data/domains.json'), 'utf-8'));
+        const allDomains = JSON.parse(fs.readFileSync(path.resolve('/data/domains.json'), 'utf-8'));
         const domainInfo = allDomains[rootDomain];
         if (!domainInfo) throw new Error("Konfigurasi untuk domain utama tidak ditemukan.");
         

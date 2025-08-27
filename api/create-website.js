@@ -210,8 +210,9 @@ async function handleCreateWebsite(request, response) {
         }
         
         const vercelProjectName = subdomain; // Nama proyek di Vercel bersih tanpa angka
+        // --- PERBAIKAN TYPO DI SINI ---
         const vercelProject = await fetch(`${VERCEL_API_BASE}/v9/projects${TEAM_QUERY}`, {
-            method: "POST", headers: VercEL_HEADERS,
+            method: "POST", headers: VERCEL_HEADERS,
             body: JSON.stringify({ name: vercelProjectName, gitRepository: { type: "github", repo: `${REPO_OWNER}/${repoName}` }, framework: null })
         }).then(res => res.json());
 
@@ -249,7 +250,7 @@ async function handleCreateWebsite(request, response) {
         
         return response.status(200).json({
             message: "Proses pembuatan website dimulai!",
-            siteData: { projectName: vercelProjectName, vercelUrl: `https://${vercelUrl}`, customUrl: `https://${finalDomain}`, status: 'pending' }
+            siteData: { projectName: vercelProjectName, vercelUrl: `httpshttps://${vercelUrl}`, customUrl: `https://${finalDomain}`, status: 'pending' }
         });
     } catch (error) {
         console.error("Create Website Error:", error);

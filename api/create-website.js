@@ -6,6 +6,10 @@ import fs from "fs";
 import path from "path";
 import { promises as dns } from 'dns';
 
+// --- Solusi Permanen: Import data domain langsung ---
+// Ini memastikan Vercel selalu menyertakan file domains.json dalam build.
+import domainsData from '../data/domains.json' assert { type: 'json' };
+
 // --- Konfigurasi ---
 const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
 const REPO_OWNER = process.env.REPO_OWNER;
@@ -20,7 +24,7 @@ const VERCEL_API_BASE = `https://api.vercel.com`;
 const VERCEL_HEADERS = { "Authorization": `Bearer ${VERCEL_TOKEN}`, "Content-Type": "application/json" };
 const TEAM_QUERY = VERCEL_TEAM_ID ? `?teamId=${VERCEL_TEAM_ID}` : '';
 
-// --- Helper Functions ---
+// --- Helper Functions (Tidak ada perubahan di sini) ---
 async function readJsonFromGithub(filePath) {
     try {
         const { data } = await octokit.repos.getContent({ owner: REPO_OWNER, repo: REPO_NAME_FOR_JSON, path: filePath });
@@ -56,7 +60,7 @@ const getAllFiles = (dirPath, arrayOfFiles) => {
     return arrayOfFiles;
 };
 
-// --- Handler Utama ---
+// --- Handler Utama (Tidak ada perubahan di sini) ---
 export default async function handler(request, response) {
     if (request.method === 'GET') {
         return handleGetDomains(request, response);
@@ -72,17 +76,17 @@ export default async function handler(request, response) {
     return response.status(405).json({ message: 'Metode tidak diizinkan.' });
 }
 
-// --- Logika GET ---
+// --- Logika GET yang diperbarui ---
 async function handleGetDomains(req, res) {
     try {
-        const domainsData = JSON.parse(fs.readFileSync(path.resolve('./data/domains.json'), 'utf-8'));
+        // Langsung gunakan data yang sudah di-import, tidak perlu fs.readFileSync
         return res.status(200).json(Object.keys(domainsData));
     } catch (error) {
-        return res.status(500).json({ message: "Gagal memuat daftar domain." });
+        return res.status(500).json({ message: "Gagal memproses data domain." });
     }
 }
 
-// --- Logika POST untuk Admin, Cek Status, Cek Subdomain ---
+// --- Logika POST (Tidak ada perubahan di sini) ---
 async function handleJsonActions(req, res) {
     try {
         const { action, data, adminPassword } = req.body;
@@ -155,7 +159,6 @@ async function handleJsonActions(req, res) {
     }
 }
 
-// --- Logika POST untuk Create Website ---
 async function handleCreateWebsite(request, response) {
     const tempDir = path.join("/tmp", `website-${Date.now()}`);
     try {
@@ -166,7 +169,6 @@ async function handleCreateWebsite(request, response) {
 
         if (!subdomain || !rootDomain || !apiKey || !uploadedFile) throw new Error("Semua kolom wajib diisi.");
 
-        // Cek apakah nama proyek (subdomain) sudah ada di Vercel
         const projectCheck = await fetch(`${VERCEL_API_BASE}/v9/projects/${subdomain}${TEAM_QUERY}`, { headers: VERCEL_HEADERS });
         if(projectCheck.ok) {
             throw new Error(`Nama website '${subdomain}' sudah digunakan. Harap gunakan nama lain.`);
@@ -209,8 +211,7 @@ async function handleCreateWebsite(request, response) {
             });
         }
         
-        const vercelProjectName = subdomain; // Nama proyek di Vercel bersih tanpa angka
-        // --- PERBAIKAN TYPO DI SINI ---
+        const vercelProjectName = subdomain;
         const vercelProject = await fetch(`${VERCEL_API_BASE}/v9/projects${TEAM_QUERY}`, {
             method: "POST", headers: VERCEL_HEADERS,
             body: JSON.stringify({ name: vercelProjectName, gitRepository: { type: "github", repo: `${REPO_OWNER}/${repoName}` }, framework: null })
@@ -231,8 +232,7 @@ async function handleCreateWebsite(request, response) {
             body: JSON.stringify({ name: finalDomain })
         });
         
-        const allDomains = JSON.parse(fs.readFileSync(path.resolve('./data/domains.json'), 'utf-8'));
-        const domainInfo = allDomains[rootDomain];
+        const domainInfo = domainsData[rootDomain];
         if (!domainInfo) throw new Error("Konfigurasi untuk domain utama tidak ditemukan.");
         
         const cfAuthHeader = { "Authorization": `Bearer ${domainInfo.apitoken}` };
@@ -250,7 +250,7 @@ async function handleCreateWebsite(request, response) {
         
         return response.status(200).json({
             message: "Proses pembuatan website dimulai!",
-            siteData: { projectName: vercelProjectName, vercelUrl: `httpshttps://${vercelUrl}`, customUrl: `https://${finalDomain}`, status: 'pending' }
+            siteData: { projectName: vercelProjectName, vercelUrl: `https://${vercelUrl}`, customUrl: `https://${finalDomain}`, status: 'pending' }
         });
     } catch (error) {
         console.error("Create Website Error:", error);

@@ -40,18 +40,17 @@
             width: 100%; padding: 14px; background-color: var(--primary-color); color: white; border: none;
             border-radius: 8px; font-size: 1.1em; font-weight: 600; cursor: pointer; transition: background-color 0.2s;
         }
-        button.secondary { background-color: var(--text-muted); }
         #admin-panel { display: none; }
-        .section-header { display: flex; justify-content: space-between; align-items: center; margin: 30px 0 15px; border-bottom: 1px solid var(--border-color); padding-bottom: 10px; }
+        .section-header { display: flex; justify-content: space-between; align-items: center; margin: 30px 0 15px; }
         h2 { font-size: 1.5em; }
-        .api-key-list .key-item {
+        .api-key-list .key-item, .project-list .project-item {
             display: flex; justify-content: space-between; align-items: center; padding: 15px;
             background: var(--bg-color); border-radius: 8px; margin-bottom: 10px;
             border: 1px solid var(--border-color);
         }
-        .key-info span { display: block; }
-        .key-info .key-name { font-weight: 600; }
-        .key-info .key-expiry { font-size: 0.8em; color: var(--text-muted); }
+        .key-info span, .project-info span { display: block; }
+        .key-info .key-name, .project-info .project-name { font-weight: 600; }
+        .key-info .key-expiry, .project-info .project-details { font-size: 0.8em; color: var(--text-muted); }
         .delete-btn { background-color: var(--error-color); color: white; border: none; padding: 8px 12px; border-radius: 6px; cursor: pointer; }
         .duration-group { display: flex; gap: 10px; }
         .permanent-toggle { display: flex; align-items: center; gap: 10px; margin-top: 15px; }
@@ -59,15 +58,15 @@
         .permanent-toggle label { margin: 0; }
         a.back-link { color: var(--primary-color); text-decoration: none; display: block; text-align: center; margin-top: 20px; font-size: 0.9em;}
         
-        .loading-overlay {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background-color: var(--bg-color); z-index: 10000;
-            display: flex; flex-direction: column; justify-content: center; align-items: center;
-            opacity: 1; transition: opacity 0.5s ease;
-        }
-        .loading-overlay.hidden { opacity: 0; pointer-events: none; }
-        .loading-logo { font-size: 3em; color: var(--primary-color); margin-bottom: 20px; animation: pulse 1.5s infinite ease-in-out; }
-        @keyframes pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.1); } }
+        /* --- Gaya Modal --- */
+        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); display: flex; justify-content: center; align-items: center; z-index: 1000; opacity: 0; visibility: hidden; transition: opacity 0.3s; backdrop-filter: blur(5px); }
+        .modal-overlay.show { opacity: 1; visibility: visible; }
+        .modal-content { background: var(--card-bg); border-radius: 20px; padding: 25px; width: 90%; max-width: 600px; transform: scale(0.9); transition: transform 0.3s; max-height: 80vh; display: flex; flex-direction: column; }
+        .modal-overlay.show .modal-content { transform: scale(1); }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 15px; margin-bottom: 20px; }
+        .modal-header h2 { margin: 0; }
+        .close-btn { background: none; border: none; font-size: 1.5em; cursor: pointer; color: var(--text-muted); padding: 0; width: auto; }
+        .modal-body { overflow-y: auto; }
 
         .theme-toggle {
             position: fixed; bottom: 20px; right: 20px; width: 50px; height: 50px;
@@ -76,35 +75,9 @@
             font-size: 1.2em; cursor: pointer; box-shadow: 0 4px 12px rgba(0,0,0,0.1);
             z-index: 1001;
         }
-
-        /* --- PENAMBAHAN: Gaya untuk Modal Manajemen Proyek --- */
-        .modal-overlay {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6);
-            display: flex; justify-content: center; align-items: center; z-index: 1000;
-            opacity: 0; visibility: hidden; transition: opacity 0.3s; backdrop-filter: blur(5px);
-        }
-        .modal-overlay.show { opacity: 1; visibility: visible; }
-        .modal-content {
-            background: var(--card-bg); border-radius: 20px; padding: 25px;
-            width: 90%; max-width: 600px; max-height: 80vh; overflow-y: auto;
-            transform: scale(0.9); transition: transform 0.3s;
-        }
-        .modal-overlay.show .modal-content { transform: scale(1); }
-        .modal-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 15px; margin-bottom: 20px;}
-        .modal-header h2 { margin: 0; font-size: 1.3em; }
-        .modal-close-btn { background: none; border: none; font-size: 1.5em; cursor: pointer; color: var(--text-muted); }
-        .project-list { max-height: 300px; overflow-y: auto; padding-right: 10px; }
-        .project-item { display: flex; justify-content: space-between; align-items: center; padding: 12px; border-radius: 8px; margin-bottom: 8px; background: var(--bg-color); }
-        .project-info span { display: block; }
-        .project-name { font-weight: 500; }
-        .project-date { font-size: 0.8em; color: var(--text-muted); }
     </style>
 </head>
 <body>
-    <div id="loading-overlay" class="loading-overlay">
-        <i class="fas fa-shield-alt loading-logo"></i>
-        <p>Memuat Panel Admin...</p>
-    </div>
 
     <div id="login-screen" class="admin-card">
         <h1><i class="fas fa-lock"></i> Admin Login</h1>
@@ -117,11 +90,6 @@
     </div>
 
     <div id="admin-panel" class="admin-card">
-        <div class="section-header">
-            <h2><i class="fas fa-tasks"></i> Panel Kontrol</h2>
-        </div>
-        <button id="manage-projects-btn" class="secondary"><i class="fas fa-cogs"></i> Kelola Proyek & Repositori</button>
-
         <div class="section-header">
             <h2><i class="fas fa-key"></i> Buat API Key Baru</h2>
         </div>
@@ -152,24 +120,24 @@
             <h2><i class="fas fa-list-ul"></i> Daftar API Key Aktif</h2>
         </div>
         <div class="api-key-list" id="api-key-list-container"></div>
+        
+        <div class="section-header">
+             <h2><i class="fas fa-sitemap"></i> Manajemen Proyek</h2>
+        </div>
+        <button id="show-projects-btn">Tampilkan Daftar Proyek</button>
     </div>
     
     <div id="projects-modal" class="modal-overlay">
         <div class="modal-content">
             <div class="modal-header">
-                <h2>Manajemen Proyek</h2>
-                <button id="modal-close-btn" class="modal-close-btn">&times;</button>
+                <h2><i class="fas fa-list"></i> Daftar Proyek Website</h2>
+                <button id="modal-close-btn" class="close-btn">&times;</button>
             </div>
-            <div class="modal-body">
-                <h3><i class="fab fa-vercel"></i> Proyek Vercel</h3>
-                <div class="project-list" id="vercel-projects-list"><p>Memuat...</p></div>
-                
-                <h3 style="margin-top: 20px;"><i class="fab fa-github"></i> Repositori GitHub</h3>
-                <div class="project-list" id="github-projects-list"><p>Memuat...</p></div>
-            </div>
+            <div class="modal-body project-list" id="project-list-container">
+                </div>
         </div>
     </div>
-    
+
     <div id="theme-toggle" class="theme-toggle">
         <i class="fas fa-moon"></i>
     </div>

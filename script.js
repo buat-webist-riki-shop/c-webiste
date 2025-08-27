@@ -1,9 +1,4 @@
-// public/script.js
-
 document.addEventListener('DOMContentLoaded', () => {
-    // Tandai waktu mulai saat script pertama kali dijalankan
-    const startTime = performance.now();
-
     // Elemen UI
     const creatorForm = document.getElementById('creator-form');
     const subdomainInput = document.getElementById('subdomain-name');
@@ -24,9 +19,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const modalCustomUrl = document.getElementById('modal-custom-url');
     const modalCheckStatusBtn = document.getElementById('modal-check-status-btn');
 
-    // Elemen Tema & Loading
+    // Elemen Tema
     const themeToggle = document.getElementById('theme-toggle');
-    const loadingOverlay = document.getElementById('loading-overlay');
     const body = document.body;
     let debounceTimer;
     let toastTimeout;
@@ -40,7 +34,7 @@ document.addEventListener('DOMContentLoaded', () => {
         toast.className = '';
         toast.classList.add(type);
         toast.classList.add('show');
-        toastTimeout = setTimeout(() => { toast.classList.remove('show'); }, 4000);
+        toastTimeout = setTimeout(() => { toast.classList.remove('show'); }, 3000);
     };
 
     const applyTheme = (theme) => {
@@ -89,14 +83,12 @@ document.addEventListener('DOMContentLoaded', () => {
             const item = document.createElement('div');
             item.className = 'sites-list-item';
             item.dataset.project = site.projectName;
-            const statusClass = site.status === 'success' ? 'success' : 'pending';
-            const statusText = site.status === 'success' ? 'Aktif' : 'Menunggu';
             item.innerHTML = `
                 <div class="site-info">
                     <h3>${site.customUrl.replace('https://','')}</h3>
                     <p>${site.vercelUrl.replace('https://','')}</p>
                 </div>
-                <span class="status ${statusClass}">${statusText}</span>
+                <span class="status ${site.status}">${site.status === 'success' ? 'Aktif' : 'Menunggu'}</span>
             `;
             sitesList.appendChild(item);
         });
@@ -115,41 +107,30 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const updateModalStatus = (status) => {
         modalCheckStatusBtn.disabled = false;
+        modalCheckStatusBtn.innerHTML = '<i class="fas fa-sync-alt"></i> <span id="modal-status-text">Cek Status</span>';
         
         if (status === 'success') {
             modalCheckStatusBtn.className = 'status success';
-            modalCheckStatusBtn.innerHTML = '<i class="fas fa-check"></i> Aktif';
+            modalCheckStatusBtn.textContent = 'Aktif';
             modalCheckStatusBtn.disabled = true;
         } else {
             modalCheckStatusBtn.className = 'check-status-btn status pending';
-            modalCheckStatusBtn.innerHTML = '<i class="fas fa-sync-alt"></i> Cek Status';
+            modalCheckStatusBtn.innerHTML = '<i class="fas fa-sync-alt"></i> <span id="modal-status-text">Cek Status</span>';
         }
     };
 
-    // --- MODIFIKASI KUNCI: Menambahkan batas waktu (timeout) pada fungsi ini ---
     const fetchDomains = async () => {
-        // Buat AbortController untuk membatalkan fetch jika terlalu lama
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 8000); // Batas waktu 8 detik
-
         try {
-            const response = await fetch('/api/create-website', {
-                signal: controller.signal // Kaitkan sinyal abort ke fetch
-            });
-            clearTimeout(timeoutId); // Batalkan timeout jika fetch berhasil
-
-            if (!response.ok) {
-                const errorResult = await response.json();
-                throw new Error(errorResult.message || 'Gagal memuat domain dari server.');
-            }
-            
+            const response = await fetch('/api/create-website');
+            if (!response.ok) throw new Error('Gagal memuat domain');
             const domains = await response.json();
+
             rootDomainSelect.innerHTML = '';
             if (domains.length > 0) {
                 domains.forEach(domain => {
                     const option = document.createElement('option');
                     option.value = domain;
-                    option.textContent = domain;
+                    option.textContent = `.${domain}`;
                     rootDomainSelect.appendChild(option);
                 });
             } else {
@@ -158,12 +139,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         } catch (error) {
             console.error(error);
-            rootDomainSelect.innerHTML = '<option value="">Gagal memuat domain</option>';
-            // Beri pesan error yang jelas kepada pengguna
-            if (error.name === 'AbortError') {
-                throw new Error('Server tidak merespons. Gagal memuat daftar domain.');
-            }
-            throw error; // Lemparkan error lainnya
+            rootDomainSelect.innerHTML = '<option value="">Error memuat</option>';
         }
     };
     
@@ -209,7 +185,7 @@ document.addEventListener('DOMContentLoaded', () => {
         
         clearTimeout(debounceTimer);
         debounceTimer = setTimeout(() => {
-            if (e.target.value) {
+            if (e.target.value) { // Hanya cek jika input tidak kosong
                 checkSubdomainAvailability();
             } else {
                 subdomainStatus.textContent = '';
@@ -225,9 +201,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     creatorForm.addEventListener('submit', async (e) => {
         e.preventDefault();
-        if (subdomainStatus.classList.contains('taken')) {
-            return showToast('Nama domain sudah digunakan!', 'error');
-        }
         if (!subdomainInput.value || !rootDomainSelect.value || !websiteFileInput.files[0] || !userApiKeyInput.value) {
             return showToast('Harap isi semua kolom!', 'error');
         }
@@ -286,7 +259,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const { domain, project } = btn.dataset;
         
         btn.disabled = true;
-        btn.innerHTML = '<div class="spinner" style="width:15px; height:15px; border-width:2px; border-top-color: var(--primary-color);"></div> Memeriksa...';
+        btn.innerHTML = '<div class="spinner" style="width:15px; height:15px; border-width:2px;"></div> Memeriksa...';
         
         try {
             const response = await fetch('/api/create-website', {
@@ -297,16 +270,20 @@ document.addEventListener('DOMContentLoaded', () => {
             const result = await response.json();
             if (!response.ok) throw new Error(result.message);
             
-            let finalStatus = result.status;
-            const updatedSite = updateSiteStatus(project, finalStatus);
-            if(updatedSite) updateModalStatus(updatedSite.status);
+            // Hanya update jika status berubah
+            if(result.status === 'success') {
+                const updatedSite = updateSiteStatus(project, result.status);
+                if(updatedSite) updateModalStatus(updatedSite.status);
+                renderSitesList();
+            } else {
+                 updateModalStatus('pending');
+            }
             
-            renderSitesList();
-            showToast(result.message, finalStatus);
+            showToast(result.message, result.status === 'success' ? 'success' : 'info');
 
         } catch (error) {
             showToast(error.message, 'error');
-            updateModalStatus('pending');
+            updateModalStatus('pending'); // Kembalikan ke pending jika error
         }
     });
     
@@ -315,21 +292,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const savedTheme = localStorage.getItem('theme_preference_v1') || 'light';
         applyTheme(savedTheme);
         renderSitesList();
-        
-        try {
-            await fetchDomains();
-        } catch(error) {
-            console.error("Inisialisasi gagal:", error);
-            showToast(error.message, "error");
-        } finally {
-            const minimumLoadingTime = 300;
-            const elapsedTime = performance.now() - startTime;
-            const remainingTime = minimumLoadingTime - elapsedTime;
-
-            setTimeout(() => {
-                loadingOverlay.classList.add('hidden');
-            }, Math.max(0, remainingTime));
-        }
+        await fetchDomains();
     };
     
     initializePage();

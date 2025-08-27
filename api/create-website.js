@@ -145,42 +145,54 @@ async function handleCreateWebsite(request, response) {
             body: JSON.stringify({
                 name: repoName,
                 gitRepository: { type: "github", repo: `${REPO_OWNER}/${repoName}` },
-                framework: null // [PERUBAHAN 1] Eksplisit set framework ke "Other" (static)
+                framework: null
             })
         }).then(res => res.json());
         if (vercelProject.error) throw new Error(`Vercel Error: ${vercelProject.error.message}`);
         
-        // [PERUBAHAN 2] Paksa Vercel untuk memulai deployment
         const triggerDeployUrl = VERCEL_TEAM_ID ? `https://api.vercel.com/v13/deployments?teamId=${VERCEL_TEAM_ID}` : `https://api.vercel.com/v13/deployments`;
         await fetch(triggerDeployUrl, {
             method: 'POST',
             headers: { "Authorization": `Bearer ${VERCEL_TOKEN}`, "Content-Type": "application/json" },
             body: JSON.stringify({
                 name: repoName,
-                gitSource: {
-                    type: 'github',
-                    repoId: vercelProject.link.repoId,
-                    ref: 'main' // Deploy dari branch 'main'
-                },
-                target: 'production' // Jadikan ini sebagai production deployment
+                gitSource: { type: 'github', repoId: vercelProject.link.repoId, ref: 'main' },
+                target: 'production'
             })
         }).then(res => res.json());
 
         const finalDomain = `${subdomain}.${rootDomain}`;
+        // [PERUBAHAN 1] Tangkap respons dari Vercel saat menambahkan domain
         const addDomainRes = await fetch(`https://api.vercel.com/v10/projects/${repoName}/domains${VERCEL_TEAM_ID ? `?teamId=${VERCEL_TEAM_ID}` : ''}`, {
             method: "POST", headers: { "Authorization": `Bearer ${VERCEL_TOKEN}`, "Content-Type": "application/json" },
             body: JSON.stringify({ name: finalDomain })
         }).then(res => res.json());
         if (addDomainRes.error) throw new Error(`Vercel Domain Error: ${addDomainRes.error.message}`);
 
+        // [PERUBAHAN 2] Ambil data DNS yang direkomendasikan Vercel dari respons API
+        const verificationRecord = addDomainRes.verification.find(rec => rec.type === 'CNAME');
+        if (!verificationRecord) {
+             // Jika Vercel merekomendasikan A record sebagai gantinya
+             const aRecord = await fetch(`https://api.vercel.com/v4/domains/${finalDomain}/config?teamId=${VERCEL_TEAM_ID || ''}`, { headers: { "Authorization": `Bearer ${VERCEL_TOKEN}` }}).then(res => res.json());
+             if (aRecord.misconfigured) throw new Error("Gagal mendapatkan konfigurasi DNS dari Vercel.");
+             verificationRecord = { type: 'A', value: aRecord.acceptedChallenges[0].value };
+        }
+        
         const allDomains = JSON.parse(fs.readFileSync(path.resolve('./data/domains.json'), 'utf-8'));
         const domainInfo = allDomains[rootDomain];
         if (!domainInfo) throw new Error("Konfigurasi untuk domain utama tidak ditemukan.");
 
+        // [PERUBAHAN 3] Gunakan data dinamis dari Vercel untuk membuat record DNS di Cloudflare
         await fetch(`https://api.cloudflare.com/client/v4/zones/${domainInfo.zone}/dns_records`, {
             method: "POST",
             headers: { "Authorization": `Bearer ${domainInfo.apitoken}`, "Content-Type": "application/json" },
-            body: JSON.stringify({ type: "CNAME", name: subdomain, content: "cname.vercel-dns.com", proxied: false, ttl: 1 })
+            body: JSON.stringify({
+                type: verificationRecord.type,      // Gunakan tipe yang direkomendasikan (A atau CNAME)
+                name: subdomain,
+                content: verificationRecord.value, // Gunakan value/alamat baru yang unik
+                proxied: false,
+                ttl: 1
+            })
         });
         
         return response.status(200).json({ message: "Website berhasil dibuat!", url: `https://${finalDomain}` });

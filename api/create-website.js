@@ -5,10 +5,6 @@ import AdmZip from "adm-zip";
 import fs from "fs";
 import path from "path";
 import { promises as dns } from 'dns';
-// --- PERUBAHAN 1: Gunakan metode import klasik yang kompatibel ---
-import { createRequire } from 'module';
-const require = createRequire(import.meta.url);
-const domainsData = require('../data/domains.json');
 
 // --- Konfigurasi ---
 const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
@@ -79,29 +75,30 @@ export default async function handler(request, response) {
 // --- Logika GET ---
 async function handleGetDomains(req, res) {
     try {
+        const domainsData = JSON.parse(fs.readFileSync(path.resolve('./data/domains.json'), 'utf-8'));
         return res.status(200).json(Object.keys(domainsData));
     } catch (error) {
-        return res.status(500).json({ message: "Gagal memproses data domain." });
+        return res.status(500).json({ message: "Gagal memuat daftar domain." });
     }
 }
 
-// --- Logika POST ---
+// --- Logika POST untuk Admin, Cek Status, Cek Subdomain ---
 async function handleJsonActions(req, res) {
     try {
         const { action, data, adminPassword } = req.body;
         
+        // Aksi publik (tidak perlu password)
         switch(action) {
             case 'checkDomainStatus': {
                 const { domain } = data;
                 if (!domain) return res.status(400).json({ message: "Nama domain diperlukan." });
                 try {
-                    // Cek domain config langsung, lebih reliable
-                    const domainInfo = await fetch(`${VERCEL_API_BASE}/v6/domains/${domain}/config${TEAM_QUERY}`, { headers: VERCEL_HEADERS }).then(r => r.json());
-                    if (domainInfo.configuredBy) {
-                       return res.status(200).json({ status: 'success', message: 'Domain sudah terhubung dengan benar.' });
+                    const addresses = await dns.resolve(domain);
+                    if (addresses.includes(VERCEL_A_RECORD)) {
+                        return res.status(200).json({ status: 'success', message: 'Domain sudah terhubung dengan benar.' });
                     }
                 } catch (err) {}
-                return res.status(200).json({ status: 'pending', message: 'Domain belum terhubung atau masih dalam proses.' });
+                return res.status(200).json({ status: 'pending', message: 'Domain belum terhubung.' });
             }
             case 'checkSubdomain': {
                 const { subdomain, rootDomain } = data;
@@ -113,6 +110,7 @@ async function handleJsonActions(req, res) {
             }
         }
         
+        // Aksi admin (perlu password)
         if (adminPassword !== ADMIN_PASSWORD) return res.status(403).json({ message: "Password admin salah."});
 
         const APIKEYS_PATH = "data/apikeys.json";
@@ -153,6 +151,7 @@ async function handleJsonActions(req, res) {
     }
 }
 
+// --- Logika POST untuk Create Website ---
 async function handleCreateWebsite(request, response) {
     const tempDir = path.join("/tmp", `website-${Date.now()}`);
     try {
@@ -160,14 +159,8 @@ async function handleCreateWebsite(request, response) {
         const [fields, files] = await form.parse(request);
         const { subdomain, rootDomain, apiKey } = Object.fromEntries(Object.entries(fields).map(([k, v]) => [k, v[0]]));
         const uploadedFile = files.websiteFile[0];
-
         if (!subdomain || !rootDomain || !apiKey || !uploadedFile) throw new Error("Semua kolom wajib diisi.");
 
-        const projectCheck = await fetch(`${VERCEL_API_BASE}/v9/projects/${subdomain}${TEAM_QUERY}`, { headers: VERCEL_HEADERS });
-        if(projectCheck.ok) {
-            throw new Error(`Nama website '${subdomain}' sudah digunakan. Harap gunakan nama lain.`);
-        }
-        
         const validApiKeys = await readJsonFromGithub("data/apikeys.json");
         const keyData = validApiKeys[apiKey];
         if (!keyData || (keyData.expires_at !== "permanent" && new Date() > new Date(keyData.expires_at))) {
@@ -191,8 +184,8 @@ async function handleCreateWebsite(request, response) {
         if (!fs.existsSync(path.join(uploadRoot, "index.html"))) {
             throw new Error("File 'index.html' tidak ditemukan di dalam root file yang diunggah.");
         }
-        
-        const repoName = `${subdomain}-${Math.floor(100 + Math.random() * 900)}`;
+
+        const repoName = `${subdomain.replace(/[^a-z0-9-]/gi, '')}-${Math.floor(100 + Math.random() * 900)}`;
         await octokit.repos.createForAuthenticatedUser({ name: repoName, private: true });
         
         const allFiles = getAllFiles(uploadRoot);
@@ -205,28 +198,30 @@ async function handleCreateWebsite(request, response) {
             });
         }
         
-        const vercelProjectName = subdomain;
         const vercelProject = await fetch(`${VERCEL_API_BASE}/v9/projects${TEAM_QUERY}`, {
             method: "POST", headers: VERCEL_HEADERS,
-            body: JSON.stringify({ name: vercelProjectName, gitRepository: { type: "github", repo: `${REPO_OWNER}/${repoName}` }, framework: null })
+            body: JSON.stringify({ name: repoName, gitRepository: { type: "github", repo: `${REPO_OWNER}/${repoName}` }, framework: null })
         }).then(res => res.json());
 
         if (vercelProject.error) throw new Error(`Vercel Error: ${vercelProject.error.message}`);
         
-        const vercelUrl = `${vercelProjectName}.vercel.app`;
+        // --- PERBAIKAN DI SINI ---
+        // Kita buat URL-nya sendiri karena lebih aman daripada membaca dari 'alias'
+        const vercelUrl = `${repoName}.vercel.app`;
         
         await fetch(`${VERCEL_API_BASE}/v13/deployments${TEAM_QUERY}`, {
             method: 'POST', headers: VERCEL_HEADERS,
-            body: JSON.stringify({ name: vercelProjectName, gitSource: { type: 'github', repoId: vercelProject.link.repoId, ref: 'main' }, target: 'production' })
+            body: JSON.stringify({ name: repoName, gitSource: { type: 'github', repoId: vercelProject.link.repoId, ref: 'main' }, target: 'production' })
         });
 
         const finalDomain = `${subdomain}.${rootDomain}`;
-        await fetch(`${VERCEL_API_BASE}/v10/projects/${vercelProjectName}/domains${TEAM_QUERY}`, {
+        await fetch(`${VERCEL_API_BASE}/v10/projects/${repoName}/domains${TEAM_QUERY}`, {
             method: "POST", headers: VERCEL_HEADERS,
             body: JSON.stringify({ name: finalDomain })
         });
         
-        const domainInfo = domainsData[rootDomain];
+        const allDomains = JSON.parse(fs.readFileSync(path.resolve('./data/domains.json'), 'utf-8'));
+        const domainInfo = allDomains[rootDomain];
         if (!domainInfo) throw new Error("Konfigurasi untuk domain utama tidak ditemukan.");
         
         const cfAuthHeader = { "Authorization": `Bearer ${domainInfo.apitoken}` };
@@ -244,7 +239,7 @@ async function handleCreateWebsite(request, response) {
         
         return response.status(200).json({
             message: "Proses pembuatan website dimulai!",
-            siteData: { projectName: vercelProjectName, vercelUrl: `https://${vercelUrl}`, customUrl: `https://${finalDomain}`, status: 'pending' }
+            siteData: { projectName: repoName, vercelUrl: `https://${vercelUrl}`, customUrl: `https://${finalDomain}`, status: 'pending' }
         });
     } catch (error) {
         console.error("Create Website Error:", error);

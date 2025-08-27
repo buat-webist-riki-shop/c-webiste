@@ -202,9 +202,12 @@ async function handleCreateWebsite(request, response) {
             method: "POST", headers: VERCEL_HEADERS,
             body: JSON.stringify({ name: repoName, gitRepository: { type: "github", repo: `${REPO_OWNER}/${repoName}` }, framework: null })
         }).then(res => res.json());
+
         if (vercelProject.error) throw new Error(`Vercel Error: ${vercelProject.error.message}`);
         
-        const vercelUrl = vercelProject.alias.find(a => a.domain.endsWith('.vercel.app')).domain;
+        // --- PERBAIKAN DI SINI ---
+        // Kita buat URL-nya sendiri karena lebih aman daripada membaca dari 'alias'
+        const vercelUrl = `${repoName}.vercel.app`;
         
         await fetch(`${VERCEL_API_BASE}/v13/deployments${TEAM_QUERY}`, {
             method: 'POST', headers: VERCEL_HEADERS,

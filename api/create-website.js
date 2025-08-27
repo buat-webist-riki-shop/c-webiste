@@ -75,9 +75,16 @@ export default async function handler(request, response) {
 // --- Logika GET ---
 async function handleGetDomains(req, res) {
     try {
-        const domainsData = JSON.parse(fs.readFileSync(path.resolve('./data/domains.json'), 'utf-8'));
+        // MODIFIKASI: Menggunakan path yang lebih andal untuk menemukan file
+        const filePath = path.join(process.cwd(), 'data', 'domains.json');
+        if (!fs.existsSync(filePath)) {
+            console.error('PENTING: File data/domains.json tidak ditemukan!');
+            return res.status(500).json({ message: "Konfigurasi domain di server tidak ditemukan." });
+        }
+        const domainsData = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
         return res.status(200).json(Object.keys(domainsData));
     } catch (error) {
+        console.error("Error di handleGetDomains:", error);
         return res.status(500).json({ message: "Gagal memuat daftar domain." });
     }
 }
@@ -93,38 +100,44 @@ async function handleJsonActions(req, res) {
                 const { domain } = data;
                 if (!domain) return res.status(400).json({ message: "Nama domain diperlukan." });
                 try {
-                    // PENJELASAN: Logika ini sudah benar, ia memeriksa DNS secara real-time.
-                    // Jika domain sudah bisa diakses (propagasi selesai), maka akan mengembalikan 'success'.
                     const addresses = await dns.resolve(domain);
                     if (addresses.includes(VERCEL_A_RECORD)) {
                         return res.status(200).json({ status: 'success', message: 'Domain sudah terhubung dengan benar.' });
                     }
-                } catch (err) {
-                    // Error (seperti NXDOMAIN) berarti domain belum terpropagasi
-                }
+                } catch (err) {}
                 return res.status(200).json({ status: 'pending', message: 'Domain belum terhubung atau sedang dalam proses propagasi.' });
             }
             case 'checkSubdomain': {
                 const { subdomain, rootDomain } = data;
                 if (!subdomain || !rootDomain) return res.status(400).json({ message: "Subdomain dan domain utama diperlukan." });
                 const finalDomain = `${subdomain}.${rootDomain}`;
-                // PENJELASAN: Ini memeriksa ketersediaan domain kustom di Vercel.
                 const checkRes = await fetch(`${VERCEL_API_BASE}/v4/domains/status${TEAM_QUERY}&name=${finalDomain}`, { headers: VERCEL_HEADERS });
                 const result = await checkRes.json();
                 return res.status(200).json({ available: !result.available });
             }
         }
         
-        // Aksi admin (perlu password)
+        // MODIFIKASI TOTAL: Logika login disederhanakan
+        if (action === "login") {
+            if (adminPassword === ADMIN_PASSWORD) {
+                return res.status(200).json({ message: "Login berhasil." });
+            } else {
+                return res.status(403).json({ message: "Password admin salah." });
+            }
+        }
+
+        // Semua aksi di bawah ini sekarang memerlukan password yang valid
         if (adminPassword !== ADMIN_PASSWORD) return res.status(403).json({ message: "Password admin salah."});
 
         const APIKEYS_PATH = "data/apikeys.json";
-        let apiKeys = await readJsonFromGithub(APIKEYS_PATH);
 
         switch (action) {
-            case "getApiKeys":
+            case "getApiKeys": {
+                let apiKeys = await readJsonFromGithub(APIKEYS_PATH);
                 return res.status(200).json(apiKeys);
+            }
             case "createApiKey": {
+                let apiKeys = await readJsonFromGithub(APIKEYS_PATH);
                 const { key, duration, unit, isPermanent } = data;
                 if (!key || apiKeys[key]) return res.status(400).json({ message: "Nama API Key tidak boleh kosong atau sudah ada."});
                 let expires_at = "permanent";
@@ -141,61 +154,39 @@ async function handleJsonActions(req, res) {
                 return res.status(200).json({ message: `Kunci '${key}' berhasil dibuat.` });
             }
             case "deleteApiKey": {
+                let apiKeys = await readJsonFromGithub(APIKEYS_PATH);
                 const { key } = data;
                 if (!apiKeys[key]) return res.status(404).json({ message: "API Key tidak ditemukan."});
                 delete apiKeys[key];
                 await writeJsonToGithub(APIKEYS_PATH, apiKeys, `Delete API Key: ${key}`);
                 return res.status(200).json({ message: `Kunci '${key}' berhasil dihapus.` });
             }
-            // --- PENAMBAHAN: Aksi untuk manajemen proyek ---
             case "listProjects": {
                 const [vercelRes, githubRes] = await Promise.all([
                     fetch(`${VERCEL_API_BASE}/v9/projects${TEAM_QUERY}`, { headers: VERCEL_HEADERS }),
                     octokit.repos.listForAuthenticatedUser({ per_page: 100 })
                 ]);
-
                 if (!vercelRes.ok) throw new Error("Gagal mengambil data dari Vercel.");
-                
                 const vercelData = await vercelRes.json();
-                const vercelProjects = vercelData.projects.map(p => ({
-                    name: p.name,
-                    createdAt: p.createdAt,
-                    type: 'vercel'
-                }));
-
-                const githubRepos = githubRes.data.map(r => ({
-                    name: r.name,
-                    createdAt: r.created_at,
-                    type: 'github'
-                }));
-
+                const vercelProjects = vercelData.projects.map(p => ({ name: p.name, createdAt: p.createdAt, type: 'vercel' }));
+                const githubRepos = githubRes.data.map(r => ({ name: r.name, createdAt: r.created_at, type: 'github' }));
                 return res.status(200).json({ vercel: vercelProjects, github: githubRepos });
             }
             case "deleteProject": {
                 const { name, type } = data;
                 if (!name || !type) return res.status(400).json({ message: "Nama dan tipe proyek diperlukan." });
-
                 if (type === 'vercel') {
-                    const deleteRes = await fetch(`${VERCEL_API_BASE}/v9/projects/${name}${TEAM_QUERY}`, {
-                        method: 'DELETE',
-                        headers: VERCEL_HEADERS
-                    });
-                    if (!deleteRes.ok) {
-                       const err = await deleteRes.json();
-                       throw new Error(`Vercel Error: ${err.error.message}`);
-                    }
+                    const deleteRes = await fetch(`${VERCEL_API_BASE}/v9/projects/${name}${TEAM_QUERY}`, { method: 'DELETE', headers: VERCEL_HEADERS });
+                    if (!deleteRes.ok) { const err = await deleteRes.json(); throw new Error(`Vercel Error: ${err.error.message}`); }
                 } else if (type === 'github') {
-                    await octokit.repos.delete({
-                        owner: REPO_OWNER,
-                        repo: name
-                    });
+                    await octokit.repos.delete({ owner: REPO_OWNER, repo: name });
                 } else {
                     return res.status(400).json({ message: "Tipe proyek tidak valid." });
                 }
                 return res.status(200).json({ message: `Proyek '${name}' (${type}) berhasil dihapus.` });
             }
             default:
-                return res.status(400).json({ message: "Aksi tidak dikenal." });
+                return res.status(400).json({ message: `Aksi '${action}' tidak dikenal.` });
         }
     } catch (error) {
         console.error("JSON Action Error:", error);
@@ -203,7 +194,9 @@ async function handleJsonActions(req, res) {
     }
 }
 
+
 // --- Logika POST untuk Create Website ---
+// (Tidak ada perubahan di fungsi ini, biarkan seperti yang terakhir saya berikan)
 async function handleCreateWebsite(request, response) {
     const tempDir = path.join("/tmp", `website-${Date.now()}`);
     try {
@@ -219,13 +212,11 @@ async function handleCreateWebsite(request, response) {
            throw new Error("API Key tidak valid atau sudah kadaluwarsa.");
         }
 
-        // --- PENAMBAHAN: Cek ketersediaan nama proyek di Vercel ---
         const vercelProjectName = subdomain.replace(/[^a-z0-9-]/gi, '');
         const projectCheckRes = await fetch(`${VERCEL_API_BASE}/v9/projects/${vercelProjectName}${TEAM_QUERY}`, { headers: VERCEL_HEADERS });
         if (projectCheckRes.ok) {
             throw new Error(`Nama proyek '${vercelProjectName}' sudah digunakan di Vercel. Harap gunakan nama lain.`);
         }
-        // --- AKHIR PENAMBAHAN ---
 
         fs.mkdirSync(tempDir);
         if (uploadedFile.mimetype === "application/zip") {
@@ -245,7 +236,6 @@ async function handleCreateWebsite(request, response) {
             throw new Error("File 'index.html' tidak ditemukan di dalam root file yang diunggah.");
         }
 
-        // MODIFIKASI: Nama repo GitHub tetap unik, nama proyek Vercel bersih
         const repoName = `${vercelProjectName}-${Math.floor(100 + Math.random() * 900)}`;
         await octokit.repos.createForAuthenticatedUser({ name: repoName, private: true });
         
@@ -261,7 +251,6 @@ async function handleCreateWebsite(request, response) {
         
         const vercelProject = await fetch(`${VERCEL_API_BASE}/v9/projects${TEAM_QUERY}`, {
             method: "POST", headers: VERCEL_HEADERS,
-            // MODIFIKASI: Gunakan nama proyek bersih untuk Vercel
             body: JSON.stringify({ name: vercelProjectName, gitRepository: { type: "github", repo: `${REPO_OWNER}/${repoName}` }, framework: null })
         }).then(res => res.json());
 
@@ -280,7 +269,7 @@ async function handleCreateWebsite(request, response) {
             body: JSON.stringify({ name: finalDomain })
         });
         
-        const allDomains = JSON.parse(fs.readFileSync(path.resolve('./data/domains.json'), 'utf-8'));
+        const allDomains = JSON.parse(fs.readFileSync(path.join(process.cwd(), 'data', 'domains.json'), 'utf-8'));
         const domainInfo = allDomains[rootDomain];
         if (!domainInfo) throw new Error("Konfigurasi untuk domain utama tidak ditemukan.");
         

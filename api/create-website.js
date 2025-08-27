@@ -162,38 +162,44 @@ async function handleCreateWebsite(request, response) {
         }).then(res => res.json());
 
         const finalDomain = `${subdomain}.${rootDomain}`;
-        // [PERUBAHAN 1] Tangkap respons dari Vercel saat menambahkan domain
         const addDomainRes = await fetch(`https://api.vercel.com/v10/projects/${repoName}/domains${VERCEL_TEAM_ID ? `?teamId=${VERCEL_TEAM_ID}` : ''}`, {
             method: "POST", headers: { "Authorization": `Bearer ${VERCEL_TOKEN}`, "Content-Type": "application/json" },
             body: JSON.stringify({ name: finalDomain })
         }).then(res => res.json());
         if (addDomainRes.error) throw new Error(`Vercel Domain Error: ${addDomainRes.error.message}`);
-
-        // [PERUBAHAN 2] Ambil data DNS yang direkomendasikan Vercel dari respons API
-        const verificationRecord = addDomainRes.verification.find(rec => rec.type === 'CNAME');
-        if (!verificationRecord) {
-             // Jika Vercel merekomendasikan A record sebagai gantinya
-             const aRecord = await fetch(`https://api.vercel.com/v4/domains/${finalDomain}/config?teamId=${VERCEL_TEAM_ID || ''}`, { headers: { "Authorization": `Bearer ${VERCEL_TOKEN}` }}).then(res => res.json());
-             if (aRecord.misconfigured) throw new Error("Gagal mendapatkan konfigurasi DNS dari Vercel.");
-             verificationRecord = { type: 'A', value: aRecord.acceptedChallenges[0].value };
-        }
         
-        const allDomains = JSON.parse(fs.readFileSync(path.resolve('./data/domains.json'), 'utf-8'));
-        const domainInfo = allDomains[rootDomain];
-        if (!domainInfo) throw new Error("Konfigurasi untuk domain utama tidak ditemukan.");
+        // [PERBAIKAN] Hapus asumsi lama dan ganti dengan cara yang lebih andal
+        // Langkah 1: Minta konfigurasi DNS secara eksplisit dari Vercel
+        const domainConfigUrl = VERCEL_TEAM_ID ? `https://api.vercel.com/v4/domains/${finalDomain}/config?teamId=${VERCEL_TEAM_ID}` : `https://api.vercel.com/v4/domains/${finalDomain}/config`;
+        const domainConfig = await fetch(domainConfigUrl, {
+            headers: { "Authorization": `Bearer ${VERCEL_TOKEN}` }
+        }).then(res => res.json());
 
-        // [PERUBAHAN 3] Gunakan data dinamis dari Vercel untuk membuat record DNS di Cloudflare
-        await fetch(`https://api.cloudflare.com/client/v4/zones/${domainInfo.zone}/dns_records`, {
-            method: "POST",
-            headers: { "Authorization": `Bearer ${domainInfo.apitoken}`, "Content-Type": "application/json" },
-            body: JSON.stringify({
-                type: verificationRecord.type,      // Gunakan tipe yang direkomendasikan (A atau CNAME)
-                name: subdomain,
-                content: verificationRecord.value, // Gunakan value/alamat baru yang unik
-                proxied: false,
-                ttl: 1
-            })
-        });
+        if (!domainConfig || !domainConfig.misconfigured) {
+            // Jika Vercel melaporkan domain sudah terkonfigurasi, kita anggap selesai.
+            // Ini bisa terjadi jika prosesnya sangat cepat.
+        } else {
+            // Langkah 2: Temukan record yang direkomendasikan Vercel (A atau CNAME)
+            const recordToCreate = domainConfig.recommendedRecords.find(r => ['A', 'CNAME'].includes(r.type));
+            if (!recordToCreate) throw new Error("Gagal mendapatkan rekomendasi DNS dari Vercel.");
+            
+            const allDomains = JSON.parse(fs.readFileSync(path.resolve('./data/domains.json'), 'utf-8'));
+            const domainInfo = allDomains[rootDomain];
+            if (!domainInfo) throw new Error("Konfigurasi untuk domain utama tidak ditemukan.");
+
+            // Langkah 3: Gunakan data dinamis dari Vercel untuk membuat record DNS di Cloudflare
+            await fetch(`https://api.cloudflare.com/client/v4/zones/${domainInfo.zone}/dns_records`, {
+                method: "POST",
+                headers: { "Authorization": `Bearer ${domainInfo.apitoken}`, "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    type: recordToCreate.type,
+                    name: subdomain,
+                    content: recordToCreate.value,
+                    proxied: false,
+                    ttl: 1
+                })
+            });
+        }
         
         return response.status(200).json({ message: "Website berhasil dibuat!", url: `https://${finalDomain}` });
     } catch (error) {

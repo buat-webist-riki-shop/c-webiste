@@ -93,17 +93,22 @@ async function handleJsonActions(req, res) {
                 const { domain } = data;
                 if (!domain) return res.status(400).json({ message: "Nama domain diperlukan." });
                 try {
+                    // PENJELASAN: Logika ini sudah benar, ia memeriksa DNS secara real-time.
+                    // Jika domain sudah bisa diakses (propagasi selesai), maka akan mengembalikan 'success'.
                     const addresses = await dns.resolve(domain);
                     if (addresses.includes(VERCEL_A_RECORD)) {
                         return res.status(200).json({ status: 'success', message: 'Domain sudah terhubung dengan benar.' });
                     }
-                } catch (err) {}
-                return res.status(200).json({ status: 'pending', message: 'Domain belum terhubung.' });
+                } catch (err) {
+                    // Error (seperti NXDOMAIN) berarti domain belum terpropagasi
+                }
+                return res.status(200).json({ status: 'pending', message: 'Domain belum terhubung atau sedang dalam proses propagasi.' });
             }
             case 'checkSubdomain': {
                 const { subdomain, rootDomain } = data;
                 if (!subdomain || !rootDomain) return res.status(400).json({ message: "Subdomain dan domain utama diperlukan." });
                 const finalDomain = `${subdomain}.${rootDomain}`;
+                // PENJELASAN: Ini memeriksa ketersediaan domain kustom di Vercel.
                 const checkRes = await fetch(`${VERCEL_API_BASE}/v4/domains/status${TEAM_QUERY}&name=${finalDomain}`, { headers: VERCEL_HEADERS });
                 const result = await checkRes.json();
                 return res.status(200).json({ available: !result.available });
@@ -142,6 +147,53 @@ async function handleJsonActions(req, res) {
                 await writeJsonToGithub(APIKEYS_PATH, apiKeys, `Delete API Key: ${key}`);
                 return res.status(200).json({ message: `Kunci '${key}' berhasil dihapus.` });
             }
+            // --- PENAMBAHAN: Aksi untuk manajemen proyek ---
+            case "listProjects": {
+                const [vercelRes, githubRes] = await Promise.all([
+                    fetch(`${VERCEL_API_BASE}/v9/projects${TEAM_QUERY}`, { headers: VERCEL_HEADERS }),
+                    octokit.repos.listForAuthenticatedUser({ per_page: 100 })
+                ]);
+
+                if (!vercelRes.ok) throw new Error("Gagal mengambil data dari Vercel.");
+                
+                const vercelData = await vercelRes.json();
+                const vercelProjects = vercelData.projects.map(p => ({
+                    name: p.name,
+                    createdAt: p.createdAt,
+                    type: 'vercel'
+                }));
+
+                const githubRepos = githubRes.data.map(r => ({
+                    name: r.name,
+                    createdAt: r.created_at,
+                    type: 'github'
+                }));
+
+                return res.status(200).json({ vercel: vercelProjects, github: githubRepos });
+            }
+            case "deleteProject": {
+                const { name, type } = data;
+                if (!name || !type) return res.status(400).json({ message: "Nama dan tipe proyek diperlukan." });
+
+                if (type === 'vercel') {
+                    const deleteRes = await fetch(`${VERCEL_API_BASE}/v9/projects/${name}${TEAM_QUERY}`, {
+                        method: 'DELETE',
+                        headers: VERCEL_HEADERS
+                    });
+                    if (!deleteRes.ok) {
+                       const err = await deleteRes.json();
+                       throw new Error(`Vercel Error: ${err.error.message}`);
+                    }
+                } else if (type === 'github') {
+                    await octokit.repos.delete({
+                        owner: REPO_OWNER,
+                        repo: name
+                    });
+                } else {
+                    return res.status(400).json({ message: "Tipe proyek tidak valid." });
+                }
+                return res.status(200).json({ message: `Proyek '${name}' (${type}) berhasil dihapus.` });
+            }
             default:
                 return res.status(400).json({ message: "Aksi tidak dikenal." });
         }
@@ -167,6 +219,14 @@ async function handleCreateWebsite(request, response) {
            throw new Error("API Key tidak valid atau sudah kadaluwarsa.");
         }
 
+        // --- PENAMBAHAN: Cek ketersediaan nama proyek di Vercel ---
+        const vercelProjectName = subdomain.replace(/[^a-z0-9-]/gi, '');
+        const projectCheckRes = await fetch(`${VERCEL_API_BASE}/v9/projects/${vercelProjectName}${TEAM_QUERY}`, { headers: VERCEL_HEADERS });
+        if (projectCheckRes.ok) {
+            throw new Error(`Nama proyek '${vercelProjectName}' sudah digunakan di Vercel. Harap gunakan nama lain.`);
+        }
+        // --- AKHIR PENAMBAHAN ---
+
         fs.mkdirSync(tempDir);
         if (uploadedFile.mimetype === "application/zip") {
             const zip = new AdmZip(uploadedFile.filepath);
@@ -185,7 +245,8 @@ async function handleCreateWebsite(request, response) {
             throw new Error("File 'index.html' tidak ditemukan di dalam root file yang diunggah.");
         }
 
-        const repoName = `${subdomain.replace(/[^a-z0-9-]/gi, '')}-${Math.floor(100 + Math.random() * 900)}`;
+        // MODIFIKASI: Nama repo GitHub tetap unik, nama proyek Vercel bersih
+        const repoName = `${vercelProjectName}-${Math.floor(100 + Math.random() * 900)}`;
         await octokit.repos.createForAuthenticatedUser({ name: repoName, private: true });
         
         const allFiles = getAllFiles(uploadRoot);
@@ -200,22 +261,21 @@ async function handleCreateWebsite(request, response) {
         
         const vercelProject = await fetch(`${VERCEL_API_BASE}/v9/projects${TEAM_QUERY}`, {
             method: "POST", headers: VERCEL_HEADERS,
-            body: JSON.stringify({ name: repoName, gitRepository: { type: "github", repo: `${REPO_OWNER}/${repoName}` }, framework: null })
+            // MODIFIKASI: Gunakan nama proyek bersih untuk Vercel
+            body: JSON.stringify({ name: vercelProjectName, gitRepository: { type: "github", repo: `${REPO_OWNER}/${repoName}` }, framework: null })
         }).then(res => res.json());
 
         if (vercelProject.error) throw new Error(`Vercel Error: ${vercelProject.error.message}`);
         
-        // --- PERBAIKAN DI SINI ---
-        // Kita buat URL-nya sendiri karena lebih aman daripada membaca dari 'alias'
-        const vercelUrl = `${repoName}.vercel.app`;
+        const vercelUrl = vercelProject.alias.find(a => a.domain.endsWith('.vercel.app')).domain;
         
         await fetch(`${VERCEL_API_BASE}/v13/deployments${TEAM_QUERY}`, {
             method: 'POST', headers: VERCEL_HEADERS,
-            body: JSON.stringify({ name: repoName, gitSource: { type: 'github', repoId: vercelProject.link.repoId, ref: 'main' }, target: 'production' })
+            body: JSON.stringify({ name: vercelProjectName, gitSource: { type: 'github', repoId: vercelProject.link.repoId, ref: 'main' }, target: 'production' })
         });
 
         const finalDomain = `${subdomain}.${rootDomain}`;
-        await fetch(`${VERCEL_API_BASE}/v10/projects/${repoName}/domains${TEAM_QUERY}`, {
+        await fetch(`${VERCEL_API_BASE}/v10/projects/${vercelProjectName}/domains${TEAM_QUERY}`, {
             method: "POST", headers: VERCEL_HEADERS,
             body: JSON.stringify({ name: finalDomain })
         });
@@ -239,7 +299,7 @@ async function handleCreateWebsite(request, response) {
         
         return response.status(200).json({
             message: "Proses pembuatan website dimulai!",
-            siteData: { projectName: repoName, vercelUrl: `https://${vercelUrl}`, customUrl: `https://${finalDomain}`, status: 'pending' }
+            siteData: { projectName: vercelProjectName, vercelUrl: `https://${vercelUrl}`, customUrl: `https://${finalDomain}`, status: 'pending' }
         });
     } catch (error) {
         console.error("Create Website Error:", error);

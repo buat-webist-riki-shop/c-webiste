@@ -5,10 +5,10 @@ import AdmZip from "adm-zip";
 import fs from "fs";
 import path from "path";
 import { promises as dns } from 'dns';
-
-// --- Solusi Permanen: Import data domain langsung ---
-// Ini memastikan Vercel selalu menyertakan file domains.json dalam build.
-import domainsData from './data/domains.json' assert { type: 'json' };
+// --- PERUBAHAN 1: Gunakan metode import klasik yang kompatibel ---
+import { createRequire } from 'module';
+const require = createRequire(import.meta.url);
+const domainsData = require('../data/domains.json');
 
 // --- Konfigurasi ---
 const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
@@ -24,7 +24,7 @@ const VERCEL_API_BASE = `https://api.vercel.com`;
 const VERCEL_HEADERS = { "Authorization": `Bearer ${VERCEL_TOKEN}`, "Content-Type": "application/json" };
 const TEAM_QUERY = VERCEL_TEAM_ID ? `?teamId=${VERCEL_TEAM_ID}` : '';
 
-// --- Helper Functions (Tidak ada perubahan di sini) ---
+// --- Helper Functions ---
 async function readJsonFromGithub(filePath) {
     try {
         const { data } = await octokit.repos.getContent({ owner: REPO_OWNER, repo: REPO_NAME_FOR_JSON, path: filePath });
@@ -60,7 +60,7 @@ const getAllFiles = (dirPath, arrayOfFiles) => {
     return arrayOfFiles;
 };
 
-// --- Handler Utama (Tidak ada perubahan di sini) ---
+// --- Handler Utama ---
 export default async function handler(request, response) {
     if (request.method === 'GET') {
         return handleGetDomains(request, response);
@@ -76,17 +76,16 @@ export default async function handler(request, response) {
     return response.status(405).json({ message: 'Metode tidak diizinkan.' });
 }
 
-// --- Logika GET yang diperbarui ---
+// --- Logika GET ---
 async function handleGetDomains(req, res) {
     try {
-        // Langsung gunakan data yang sudah di-import, tidak perlu fs.readFileSync
         return res.status(200).json(Object.keys(domainsData));
     } catch (error) {
         return res.status(500).json({ message: "Gagal memproses data domain." });
     }
 }
 
-// --- Logika POST (Tidak ada perubahan di sini) ---
+// --- Logika POST ---
 async function handleJsonActions(req, res) {
     try {
         const { action, data, adminPassword } = req.body;
@@ -96,15 +95,10 @@ async function handleJsonActions(req, res) {
                 const { domain } = data;
                 if (!domain) return res.status(400).json({ message: "Nama domain diperlukan." });
                 try {
-                    const projectRes = await fetch(`${VERCEL_API_BASE}/v9/projects/${domain}${TEAM_QUERY}`, { headers: VERCEL_HEADERS }).then(r => r.json());
-                    if (projectRes.error) throw new Error();
-
-                    const domainConfig = projectRes.targets.production.alias.find(a => a === domain);
-                    if(domainConfig) {
-                         const domainInfo = await fetch(`${VERCEL_API_BASE}/v5/domains/${domain}/config${TEAM_QUERY}`, { headers: VERCEL_HEADERS }).then(r => r.json());
-                         if(domainInfo.configuredBy) {
-                            return res.status(200).json({ status: 'success', message: 'Domain sudah terhubung dengan benar.' });
-                         }
+                    // Cek domain config langsung, lebih reliable
+                    const domainInfo = await fetch(`${VERCEL_API_BASE}/v6/domains/${domain}/config${TEAM_QUERY}`, { headers: VERCEL_HEADERS }).then(r => r.json());
+                    if (domainInfo.configuredBy) {
+                       return res.status(200).json({ status: 'success', message: 'Domain sudah terhubung dengan benar.' });
                     }
                 } catch (err) {}
                 return res.status(200).json({ status: 'pending', message: 'Domain belum terhubung atau masih dalam proses.' });

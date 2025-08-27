@@ -75,7 +75,7 @@ export default async function handler(request, response) {
 // --- Logika GET ---
 async function handleGetDomains(req, res) {
     try {
-        const domainsData = JSON.parse(fs.readFileSync(path.resolve('/data/domains.json'), 'utf-8'));
+        const domainsData = JSON.parse(fs.readFileSync(path.resolve('./data/domains.json'), 'utf-8'));
         return res.status(200).json(Object.keys(domainsData));
     } catch (error) {
         return res.status(500).json({ message: "Gagal memuat daftar domain." });
@@ -97,30 +97,16 @@ async function handleJsonActions(req, res) {
                     if (addresses.includes(VERCEL_A_RECORD)) {
                         return res.status(200).json({ status: 'success', message: 'Domain sudah terhubung dengan benar.' });
                     }
-                } catch (err) {
-                     // Error (seperti NXDOMAIN) berarti belum terhubung
-                }
-                return res.status(200).json({ status: 'pending', message: 'Domain belum terhubung atau sedang dalam proses.' });
+                } catch (err) {}
+                return res.status(200).json({ status: 'pending', message: 'Domain belum terhubung.' });
             }
             case 'checkSubdomain': {
                 const { subdomain, rootDomain } = data;
                 if (!subdomain || !rootDomain) return res.status(400).json({ message: "Subdomain dan domain utama diperlukan." });
-                
-                // Cek ketersediaan di Vercel (untuk custom domain)
                 const finalDomain = `${subdomain}.${rootDomain}`;
-                const domainCheckRes = await fetch(`${VERCEL_API_BASE}/v4/domains/status${TEAM_QUERY}&name=${finalDomain}`, { headers: VERCEL_HEADERS });
-                const domainResult = await domainCheckRes.json();
-                if (domainResult.available === false) {
-                     return res.status(200).json({ available: false, message: 'Nama domain kustom sudah digunakan.' });
-                }
-
-                // Cek ketersediaan project di Vercel
-                const projectCheckRes = await fetch(`${VERCEL_API_BASE}/v9/projects/${subdomain}${TEAM_QUERY}`, { headers: VERCEL_HEADERS });
-                if (projectCheckRes.ok) { // Jika status 200 OK, berarti proyek sudah ada
-                    return res.status(200).json({ available: false, message: 'Nama website ini sudah digunakan di Vercel.' });
-                }
-
-                return res.status(200).json({ available: true });
+                const checkRes = await fetch(`${VERCEL_API_BASE}/v4/domains/status${TEAM_QUERY}&name=${finalDomain}`, { headers: VERCEL_HEADERS });
+                const result = await checkRes.json();
+                return res.status(200).json({ available: !result.available });
             }
         }
         
@@ -155,37 +141,6 @@ async function handleJsonActions(req, res) {
                 delete apiKeys[key];
                 await writeJsonToGithub(APIKEYS_PATH, apiKeys, `Delete API Key: ${key}`);
                 return res.status(200).json({ message: `Kunci '${key}' berhasil dihapus.` });
-            }
-            case "getProjects": {
-                const projectsRes = await fetch(`${VERCEL_API_BASE}/v9/projects${TEAM_QUERY}`, { headers: VERCEL_HEADERS });
-                const { projects } = await projectsRes.json();
-                const filteredProjects = projects
-                    .filter(p => p.link && p.link.type === 'github' && p.link.owner === REPO_OWNER)
-                    .map(p => ({
-                        projectName: p.name,
-                        githubRepo: p.link.repo,
-                        domains: p.alias.map(a => a.domain)
-                    }));
-                return res.status(200).json(filteredProjects);
-            }
-            case "deleteProject": {
-                const { projectName, githubRepo } = data;
-                if (!projectName || !githubRepo) return res.status(400).json({ message: "Nama proyek dan repo GitHub diperlukan." });
-                
-                // Hapus Proyek Vercel
-                const vercelDeleteRes = await fetch(`${VERCEL_API_BASE}/v9/projects/${projectName}${TEAM_QUERY}`, { method: 'DELETE', headers: VERCEL_HEADERS });
-                if (!vercelDeleteRes.ok) {
-                    const error = await vercelDeleteRes.json();
-                    return res.status(vercelDeleteRes.status).json({ message: `Gagal menghapus proyek Vercel: ${error.error.message}` });
-                }
-
-                // Hapus Repo GitHub
-                const githubDeleteRes = await octokit.repos.delete({ owner: REPO_OWNER, repo: githubRepo });
-                if (githubDeleteRes.status !== 204) {
-                     return res.status(500).json({ message: `Proyek Vercel dihapus, tapi gagal menghapus repo GitHub.` });
-                }
-
-                return res.status(200).json({ message: `Proyek "${projectName}" dan repo "${githubRepo}" berhasil dihapus.`});
             }
             default:
                 return res.status(400).json({ message: "Aksi tidak dikenal." });
@@ -230,43 +185,42 @@ async function handleCreateWebsite(request, response) {
             throw new Error("File 'index.html' tidak ditemukan di dalam root file yang diunggah.");
         }
 
-        const vercelProjectName = subdomain.replace(/[^a-z0-9-]/gi, '');
-        const githubRepoName = `${vercelProjectName}-${Math.floor(100 + Math.random() * 900)}`;
-
-        await octokit.repos.createForAuthenticatedUser({ name: githubRepoName, private: true });
+        const repoName = `${subdomain.replace(/[^a-z0-9-]/gi, '')}-${Math.floor(100 + Math.random() * 900)}`;
+        await octokit.repos.createForAuthenticatedUser({ name: repoName, private: true });
         
         const allFiles = getAllFiles(uploadRoot);
         for (const filePath of allFiles) {
             const content = fs.readFileSync(filePath, "base64");
             const githubPath = path.relative(uploadRoot, filePath).replace(/\\/g, "/");
             await octokit.repos.createOrUpdateFileContents({
-                owner: REPO_OWNER, repo: githubRepoName, path: githubPath,
+                owner: REPO_OWNER, repo: repoName, path: githubPath,
                 message: `Initial commit: ${githubPath}`, content
             });
         }
         
         const vercelProject = await fetch(`${VERCEL_API_BASE}/v9/projects${TEAM_QUERY}`, {
             method: "POST", headers: VERCEL_HEADERS,
-            body: JSON.stringify({ name: vercelProjectName, gitRepository: { type: "github", repo: `${REPO_OWNER}/${githubRepoName}` }, framework: null })
+            body: JSON.stringify({ name: repoName, gitRepository: { type: "github", repo: `${REPO_OWNER}/${repoName}` }, framework: null })
         }).then(res => res.json());
 
         if (vercelProject.error) throw new Error(`Vercel Error: ${vercelProject.error.message}`);
         
-        // Dapatkan URL vercel dari response
-        const vercelUrl = vercelProject.alias.find(a => a.domain.endsWith('.vercel.app')).domain;
+        // --- PERBAIKAN DI SINI ---
+        // Kita buat URL-nya sendiri karena lebih aman daripada membaca dari 'alias'
+        const vercelUrl = `${repoName}.vercel.app`;
         
         await fetch(`${VERCEL_API_BASE}/v13/deployments${TEAM_QUERY}`, {
             method: 'POST', headers: VERCEL_HEADERS,
-            body: JSON.stringify({ name: vercelProjectName, gitSource: { type: 'github', repoId: vercelProject.link.repoId, ref: 'main' }, target: 'production' })
+            body: JSON.stringify({ name: repoName, gitSource: { type: 'github', repoId: vercelProject.link.repoId, ref: 'main' }, target: 'production' })
         });
 
         const finalDomain = `${subdomain}.${rootDomain}`;
-        await fetch(`${VERCEL_API_BASE}/v10/projects/${vercelProjectName}/domains${TEAM_QUERY}`, {
+        await fetch(`${VERCEL_API_BASE}/v10/projects/${repoName}/domains${TEAM_QUERY}`, {
             method: "POST", headers: VERCEL_HEADERS,
             body: JSON.stringify({ name: finalDomain })
         });
         
-        const allDomains = JSON.parse(fs.readFileSync(path.resolve('/data/domains.json'), 'utf-8'));
+        const allDomains = JSON.parse(fs.readFileSync(path.resolve('./data/domains.json'), 'utf-8'));
         const domainInfo = allDomains[rootDomain];
         if (!domainInfo) throw new Error("Konfigurasi untuk domain utama tidak ditemukan.");
         
@@ -285,13 +239,7 @@ async function handleCreateWebsite(request, response) {
         
         return response.status(200).json({
             message: "Proses pembuatan website dimulai!",
-            siteData: { 
-                projectName: vercelProjectName,
-                githubRepo: githubRepoName, // Simpan juga nama repo untuk referensi
-                vercelUrl: `https://${vercelUrl}`, 
-                customUrl: `https://${finalDomain}`, 
-                status: 'pending' 
-            }
+            siteData: { projectName: repoName, vercelUrl: `https://${vercelUrl}`, customUrl: `https://${finalDomain}`, status: 'pending' }
         });
     } catch (error) {
         console.error("Create Website Error:", error);

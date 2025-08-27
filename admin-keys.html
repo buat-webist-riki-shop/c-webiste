@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin - Manajemen API Key</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        :root {
+            --bg-color: #121212; --card-bg: rgba(28, 28, 30, 0.7); --border-color: rgba(255, 255, 255, 0.1);
+            --primary-color: #0A84FF; --text-color: #F5F5F7; --text-muted: #A1A1A6;
+            --success-color: #32D74B; --error-color: #FF453A;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: 'Poppins', sans-serif; background-color: var(--bg-color); color: var(--text-color);
+            display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 20px;
+        }
+        .admin-card {
+            width: 100%; max-width: 700px; background: var(--card-bg); border: 1px solid var(--border-color);
+            border-radius: 20px; padding: 30px; backdrop-filter: blur(15px);
+        }
+        h1 { text-align: center; margin-bottom: 25px; font-weight: 600; }
+        .form-group { margin-bottom: 20px; }
+        label { display: block; font-weight: 500; font-size: 0.9em; margin-bottom: 8px; }
+        input, select {
+            width: 100%; padding: 12px; font-family: inherit; font-size: 1em; background-color: rgba(0,0,0,0.2);
+            border: 1px solid var(--border-color); color: var(--text-color); border-radius: 8px;
+        }
+        button {
+            width: 100%; padding: 14px; background-color: var(--primary-color); color: white; border: none;
+            border-radius: 8px; font-size: 1.1em; font-weight: 600; cursor: pointer;
+        }
+        #admin-panel { display: none; } /* Sembunyikan panel admin secara default */
+        .section-header { display: flex; justify-content: space-between; align-items: center; margin: 30px 0 15px; }
+        h2 { font-size: 1.5em; }
+        .api-key-list .key-item {
+            display: flex; justify-content: space-between; align-items: center; padding: 15px;
+            background: rgba(0,0,0,0.2); border-radius: 8px; margin-bottom: 10px;
+        }
+        .key-info span { display: block; }
+        .key-info .key-name { font-weight: 600; }
+        .key-info .key-expiry { font-size: 0.8em; color: var(--text-muted); }
+        .delete-btn { background-color: var(--error-color); color: white; border: none; padding: 8px 12px; border-radius: 6px; cursor: pointer; }
+        .duration-group { display: flex; gap: 10px; }
+        .permanent-toggle { display: flex; align-items: center; gap: 10px; margin-top: 15px; }
+    </style>
+</head>
+<body>
+    <div id="login-screen" class="admin-card">
+        <h1><i class="fas fa-lock"></i> Admin Login</h1>
+        <div class="form-group">
+            <label for="admin-password">Password Admin</label>
+            <input type="password" id="admin-password" placeholder="••••••••••">
+        </div>
+        <button id="login-btn">Masuk</button>
+    </div>
+
+    <div id="admin-panel" class="admin-card">
+        <div class="section-header">
+            <h2><i class="fas fa-key"></i> Buat API Key Baru</h2>
+        </div>
+        <form id="create-key-form">
+            <div class="form-group">
+                <label for="new-apikey-name">Nama Key</label>
+                <input type="text" id="new-apikey-name" placeholder="Contoh: KunciPremium-Andi" required>
+            </div>
+            <div id="duration-section">
+                <label>Durasi Aktif</label>
+                <div class="duration-group">
+                    <input type="number" id="new-apikey-duration" value="7" style="width: 80px;">
+                    <select id="new-apikey-unit">
+                        <option value="days">Hari</option>
+                        <option value="weeks">Minggu</option>
+                        <option value="months">Bulan</option>
+                    </select>
+                </div>
+            </div>
+            <div class="permanent-toggle">
+                <input type="checkbox" id="permanent-key" style="width: auto;">
+                <label for="permanent-key" style="margin: 0;">Buat Jadi Permanen</label>
+            </div>
+            <button type="submit" style="margin-top: 20px;">Buat Kunci</button>
+        </form>
+        
+        <div class="section-header">
+            <h2><i class="fas fa-list-ul"></i> Daftar API Key Aktif</h2>
+        </div>
+        <div class="api-key-list" id="api-key-list-container">
+            </div>
+    </div>
+    
+    <script src="admin-keys.js"></script>
+</body>
+</html>

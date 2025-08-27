@@ -306,7 +306,7 @@ document.addEventListener('DOMContentLoaded', () => {
             showToast("Gagal memuat komponen halaman.", "error");
         } finally {
             // MODIFIKASI: Logika loading screen dipindah ke 'finally'
-            const minimumLoadingTime = 1500;
+            const minimumLoadingTime = 500;
             const elapsedTime = performance.now() - startTime;
             const remainingTime = minimumLoadingTime - elapsedTime;
 

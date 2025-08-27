@@ -180,7 +180,7 @@ async function handleCreateWebsite(request, response) {
         await fetch(`https://api.cloudflare.com/client/v4/zones/${domainInfo.zone}/dns_records`, {
             method: "POST",
             headers: { "Authorization": `Bearer ${domainInfo.apitoken}`, "Content-Type": "application/json" },
-            body: JSON.stringify({ type: "CNAME", name: subdomain, content: "cname.vercel-dns.com", proxied: true, ttl: 1 })
+            body: JSON.stringify({ type: "CNAME", name: subdomain, content: "cname.vercel-dns.com", proxied: false, ttl: 1 })
         });
         
         return response.status(200).json({ message: "Website berhasil dibuat!", url: `https://${finalDomain}` });

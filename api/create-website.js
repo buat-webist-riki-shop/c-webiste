@@ -5,13 +5,13 @@ import AdmZip from "adm-zip";
 import fs from "fs";
 import path from "path";
 
-// --- Konfigurasi (Pastikan sudah diatur di Environment Variables Vercel) ---
+// --- Konfigurasi (Ambil dari Environment Variables Vercel) ---
 const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
 const REPO_OWNER = process.env.REPO_OWNER;
 const VERCEL_TOKEN = process.env.VERCEL_TOKEN;
 const VERCEL_TEAM_ID = process.env.VERCEL_TEAM_ID;
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
-const REPO_NAME_FOR_JSON = "c-webiste"; // Ganti dengan nama repo tempat file .json Anda disimpan
+const REPO_NAME_FOR_JSON = process.env.REPO_NAME_FOR_JSON;
 
 const octokit = new Octokit({ auth: GITHUB_TOKEN });
 
@@ -60,7 +60,6 @@ async function handleGetDomains(request, response) {
         const domainsData = JSON.parse(fs.readFileSync(path.resolve('./data/domains.json'), 'utf-8'));
         return response.status(200).json(Object.keys(domainsData));
     } catch (error) {
-        console.error("Gagal membaca domains.json:", error);
         return response.status(500).json({ message: "Gagal memuat daftar domain." });
     }
 }
@@ -81,7 +80,6 @@ async function handleAdminActions(request, response) {
                 const { key, duration, unit, isPermanent } = data;
                 if (!key) throw new Error("Nama API Key tidak boleh kosong.");
                 if (apiKeys[key]) throw new Error("API Key ini sudah ada.");
-
                 let expires_at = "permanent";
                 if (!isPermanent) {
                     const now = new Date();
@@ -144,10 +142,30 @@ async function handleCreateWebsite(request, response) {
         const vercelApiUrl = VERCEL_TEAM_ID ? `https://api.vercel.com/v9/projects?teamId=${VERCEL_TEAM_ID}` : `https://api.vercel.com/v9/projects`;
         const vercelProject = await fetch(vercelApiUrl, {
             method: "POST", headers: { "Authorization": `Bearer ${VERCEL_TOKEN}`, "Content-Type": "application/json" },
-            body: JSON.stringify({ name: repoName, gitRepository: { type: "github", repo: `${REPO_OWNER}/${repoName}` } })
+            body: JSON.stringify({
+                name: repoName,
+                gitRepository: { type: "github", repo: `${REPO_OWNER}/${repoName}` },
+                framework: null // [PERUBAHAN 1] Eksplisit set framework ke "Other" (static)
+            })
         }).then(res => res.json());
         if (vercelProject.error) throw new Error(`Vercel Error: ${vercelProject.error.message}`);
         
+        // [PERUBAHAN 2] Paksa Vercel untuk memulai deployment
+        const triggerDeployUrl = VERCEL_TEAM_ID ? `https://api.vercel.com/v13/deployments?teamId=${VERCEL_TEAM_ID}` : `https://api.vercel.com/v13/deployments`;
+        await fetch(triggerDeployUrl, {
+            method: 'POST',
+            headers: { "Authorization": `Bearer ${VERCEL_TOKEN}`, "Content-Type": "application/json" },
+            body: JSON.stringify({
+                name: repoName,
+                gitSource: {
+                    type: 'github',
+                    repoId: vercelProject.link.repoId,
+                    ref: 'main' // Deploy dari branch 'main'
+                },
+                target: 'production' // Jadikan ini sebagai production deployment
+            })
+        }).then(res => res.json());
+
         const finalDomain = `${subdomain}.${rootDomain}`;
         const addDomainRes = await fetch(`https://api.vercel.com/v10/projects/${repoName}/domains${VERCEL_TEAM_ID ? `?teamId=${VERCEL_TEAM_ID}` : ''}`, {
             method: "POST", headers: { "Authorization": `Bearer ${VERCEL_TOKEN}`, "Content-Type": "application/json" },
@@ -162,7 +180,7 @@ async function handleCreateWebsite(request, response) {
         await fetch(`https://api.cloudflare.com/client/v4/zones/${domainInfo.zone}/dns_records`, {
             method: "POST",
             headers: { "Authorization": `Bearer ${domainInfo.apitoken}`, "Content-Type": "application/json" },
-            body: JSON.stringify({ type: "CNAME", name: subdomain, content: "cname.vercel-dns.com", proxied: false, ttl: 1 })
+            body: JSON.stringify({ type: "CNAME", name: subdomain, content: "cname.vercel-dns.com", proxied: true, ttl: 1 })
         });
         
         return response.status(200).json({ message: "Website berhasil dibuat!", url: `https://${finalDomain}` });

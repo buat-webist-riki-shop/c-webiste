@@ -1,4 +1,7 @@
 document.addEventListener('DOMContentLoaded', () => {
+    // Tandai waktu mulai saat script pertama kali dijalankan
+    const startTime = performance.now();
+
     // Elemen UI
     const creatorForm = document.getElementById('creator-form');
     const subdomainInput = document.getElementById('subdomain-name');
@@ -19,8 +22,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const modalCustomUrl = document.getElementById('modal-custom-url');
     const modalCheckStatusBtn = document.getElementById('modal-check-status-btn');
 
-    // Elemen Tema
+    // Elemen Tema & Loading
     const themeToggle = document.getElementById('theme-toggle');
+    const loadingOverlay = document.getElementById('loading-overlay');
     const body = document.body;
     let debounceTimer;
     let toastTimeout;
@@ -270,20 +274,15 @@ document.addEventListener('DOMContentLoaded', () => {
             const result = await response.json();
             if (!response.ok) throw new Error(result.message);
             
-            // Hanya update jika status berubah
-            if(result.status === 'success') {
-                const updatedSite = updateSiteStatus(project, result.status);
-                if(updatedSite) updateModalStatus(updatedSite.status);
-                renderSitesList();
-            } else {
-                 updateModalStatus('pending');
-            }
+            const updatedSite = updateSiteStatus(project, result.status);
+            if(updatedSite) updateModalStatus(updatedSite.status);
             
-            showToast(result.message, result.status === 'success' ? 'success' : 'info');
+            renderSitesList();
+            showToast(result.message, result.status);
 
         } catch (error) {
             showToast(error.message, 'error');
-            updateModalStatus('pending'); // Kembalikan ke pending jika error
+            updateModalStatus('pending');
         }
     });
     
@@ -293,6 +292,21 @@ document.addEventListener('DOMContentLoaded', () => {
         applyTheme(savedTheme);
         renderSitesList();
         await fetchDomains();
+        
+        // --- LOGIKA BARU UNTUK DURASI MINIMAL LOADING ---
+        const minimumLoadingTime = 1500; // dalam milidetik (1.5 detik)
+        const elapsedTime = performance.now() - startTime;
+        const remainingTime = minimumLoadingTime - elapsedTime;
+
+        if (remainingTime > 0) {
+            // Jika halaman memuat lebih cepat dari durasi minimal, tunggu sisa waktunya
+            setTimeout(() => {
+                loadingOverlay.classList.add('hidden');
+            }, remainingTime);
+        } else {
+            // Jika halaman memuat lebih lama, langsung sembunyikan
+            loadingOverlay.classList.add('hidden');
+        }
     };
     
     initializePage();

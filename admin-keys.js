@@ -1,5 +1,6 @@
 document.addEventListener('DOMContentLoaded', () => {
     // Elemen UI
+    const loadingOverlay = document.getElementById('loading-overlay');
     const loginScreen = document.getElementById('login-screen');
     const adminPanel = document.getElementById('admin-panel');
     const passwordInput = document.getElementById('admin-password');
@@ -8,12 +9,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const keyListContainer = document.getElementById('api-key-list-container');
     const permanentCheckbox = document.getElementById('permanent-key');
     const durationSection = document.getElementById('duration-section');
-
-    // Elemen Manajemen Proyek
-    const showProjectsBtn = document.getElementById('show-projects-btn');
-    const projectsModal = document.getElementById('projects-modal');
-    const modalCloseBtn = document.getElementById('modal-close-btn');
-    const projectListContainer = document.getElementById('project-list-container');
     
     // Elemen Tema
     const themeToggle = document.getElementById('theme-toggle');
@@ -93,7 +88,7 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             loginBtn.textContent = 'Memverifikasi...';
             loginBtn.disabled = true;
-            await callApi('getApiKeys'); // Test call
+            await callApi('getApiKeys');
             loginScreen.style.display = 'none';
             adminPanel.style.display = 'block';
             loadApiKeys();
@@ -145,75 +140,20 @@ document.addEventListener('DOMContentLoaded', () => {
         durationSection.style.display = permanentCheckbox.checked ? 'none' : 'block';
     });
 
-    // --- LOGIKA MANAJEMEN PROYEK ---
-    const loadAndShowProjects = async () => {
-        projectListContainer.innerHTML = '<p>Memuat daftar proyek...</p>';
-        projectsModal.classList.add('show');
-        try {
-            const projects = await callApi('getProjects');
-            projectListContainer.innerHTML = '';
-            if (projects.length === 0) {
-                projectListContainer.innerHTML = '<p>Belum ada proyek yang dibuat.</p>';
-                return;
-            }
-            projects.forEach(proj => {
-                const item = document.createElement('div');
-                item.className = 'project-item';
-                item.innerHTML = `
-                    <div class="project-info">
-                        <span class="project-name">${proj.projectName}</span>
-                        <span class="project-details">Repo: ${proj.githubRepo}</span>
-                        <span class="project-details">Domain: ${proj.domains.join(', ')}</span>
-                    </div>
-                    <button class="delete-btn delete-project-btn" data-project-name="${proj.projectName}" data-github-repo="${proj.githubRepo}">
-                        <i class="fas fa-trash-alt"></i>
-                    </button>
-                `;
-                projectListContainer.appendChild(item);
-            });
-        } catch (error) {
-            projectListContainer.innerHTML = `<p style="color: red;">${error.message}</p>`;
-        }
-    };
-
-    showProjectsBtn.addEventListener('click', loadAndShowProjects);
-    modalCloseBtn.addEventListener('click', () => projectsModal.classList.remove('show'));
-    projectsModal.addEventListener('click', (e) => {
-        if (e.target === projectsModal) {
-            projectsModal.classList.remove('show');
-        }
-    });
-
-    projectListContainer.addEventListener('click', async (e) => {
-        const button = e.target.closest('.delete-project-btn');
-        if (button) {
-            const { projectName, githubRepo } = button.dataset;
-            if (confirm(`PERINGATAN!\nAnda akan menghapus proyek "${projectName}" dari Vercel DAN repository "${githubRepo}" dari GitHub.\n\n_Aksi ini tidak dapat diurungkan._\n\nLanjutkan?`)) {
-                try {
-                    button.innerHTML = 'Menghapus...';
-                    button.disabled = true;
-                    const result = await callApi('deleteProject', { projectName, githubRepo });
-                    alert(result.message); // Menampilkan notifikasi sukses
-                    loadAndShowProjects(); // Muat ulang daftar setelah berhasil
-                } catch (error) {
-                    alert(`Gagal menghapus: ${error.message}`);
-                    button.innerHTML = '<i class="fas fa-trash-alt"></i>';
-                    button.disabled = false;
-                }
-            }
-        }
-    });
-
     // --- INISIALISASI ---
     const init = () => {
         const savedTheme = localStorage.getItem('theme_preference_v1') || 'light';
         applyTheme(savedTheme);
 
-        if (sessionStorage.getItem('adminPassword')) {
-            loginBtn.click();
-        } else {
-            loginScreen.style.display = 'block';
-        }
+        // Tampilkan login screen setelah 500ms agar animasi loading terlihat
+        setTimeout(() => {
+            if (sessionStorage.getItem('adminPassword')) {
+                loginBtn.click(); // Coba login otomatis jika ada sesi
+            } else {
+                loginScreen.style.display = 'block';
+            }
+            loadingOverlay.classList.add('hidden');
+        }, 500);
     };
     
     init();

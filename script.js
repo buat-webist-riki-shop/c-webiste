@@ -38,7 +38,7 @@ document.addEventListener('DOMContentLoaded', () => {
         toast.className = '';
         toast.classList.add(type);
         toast.classList.add('show');
-        toastTimeout = setTimeout(() => { toast.classList.remove('show'); }, 3000);
+        toastTimeout = setTimeout(() => { toast.classList.remove('show'); }, 4000); // Durasi toast diperpanjang
     };
 
     const applyTheme = (theme) => {
@@ -87,12 +87,14 @@ document.addEventListener('DOMContentLoaded', () => {
             const item = document.createElement('div');
             item.className = 'sites-list-item';
             item.dataset.project = site.projectName;
+            const statusClass = site.status === 'success' ? 'success' : 'pending';
+            const statusText = site.status === 'success' ? 'Aktif' : 'Menunggu';
             item.innerHTML = `
                 <div class="site-info">
                     <h3>${site.customUrl.replace('https://','')}</h3>
                     <p>${site.vercelUrl.replace('https://','')}</p>
                 </div>
-                <span class="status ${site.status}">${site.status === 'success' ? 'Aktif' : 'Menunggu'}</span>
+                <span class="status ${statusClass}">${statusText}</span>
             `;
             sitesList.appendChild(item);
         });
@@ -111,20 +113,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const updateModalStatus = (status) => {
         modalCheckStatusBtn.disabled = false;
-        modalCheckStatusBtn.innerHTML = '<i class="fas fa-sync-alt"></i> <span id="modal-status-text">Cek Status</span>';
         
         if (status === 'success') {
             modalCheckStatusBtn.className = 'status success';
-            modalCheckStatusBtn.textContent = 'Aktif';
+            modalCheckStatusBtn.innerHTML = '<i class="fas fa-check"></i> Aktif';
             modalCheckStatusBtn.disabled = true;
         } else {
             modalCheckStatusBtn.className = 'check-status-btn status pending';
-            modalCheckStatusBtn.innerHTML = '<i class="fas fa-sync-alt"></i> <span id="modal-status-text">Cek Status</span>';
+            modalCheckStatusBtn.innerHTML = '<i class="fas fa-sync-alt"></i> Cek Status';
         }
     };
 
     const fetchDomains = async () => {
         try {
+            // MODIFIKASI: Path disesuaikan, seharusnya cukup /api/create-website
             const response = await fetch('/api/create-website');
             if (!response.ok) throw new Error('Gagal memuat domain');
             const domains = await response.json();
@@ -134,7 +136,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 domains.forEach(domain => {
                     const option = document.createElement('option');
                     option.value = domain;
-                    option.textContent = `.${domain}`;
+                    option.textContent = domain; // Tampilkan nama domain lengkap
                     rootDomainSelect.appendChild(option);
                 });
             } else {
@@ -189,7 +191,7 @@ document.addEventListener('DOMContentLoaded', () => {
         
         clearTimeout(debounceTimer);
         debounceTimer = setTimeout(() => {
-            if (e.target.value) { // Hanya cek jika input tidak kosong
+            if (e.target.value) {
                 checkSubdomainAvailability();
             } else {
                 subdomainStatus.textContent = '';
@@ -205,6 +207,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     creatorForm.addEventListener('submit', async (e) => {
         e.preventDefault();
+        if (subdomainStatus.classList.contains('taken')) {
+            return showToast('Nama domain sudah digunakan!', 'error');
+        }
         if (!subdomainInput.value || !rootDomainSelect.value || !websiteFileInput.files[0] || !userApiKeyInput.value) {
             return showToast('Harap isi semua kolom!', 'error');
         }
@@ -263,7 +268,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const { domain, project } = btn.dataset;
         
         btn.disabled = true;
-        btn.innerHTML = '<div class="spinner" style="width:15px; height:15px; border-width:2px;"></div> Memeriksa...';
+        btn.innerHTML = '<div class="spinner" style="width:15px; height:15px; border-width:2px; border-top-color: var(--primary-color);"></div> Memeriksa...';
         
         try {
             const response = await fetch('/api/create-website', {
@@ -274,14 +279,16 @@ document.addEventListener('DOMContentLoaded', () => {
             const result = await response.json();
             if (!response.ok) throw new Error(result.message);
             
-            const updatedSite = updateSiteStatus(project, result.status);
+            let finalStatus = result.status; // 'success' or 'pending'
+            const updatedSite = updateSiteStatus(project, finalStatus);
             if(updatedSite) updateModalStatus(updatedSite.status);
             
             renderSitesList();
-            showToast(result.message, result.status);
+            showToast(result.message, finalStatus);
 
         } catch (error) {
             showToast(error.message, 'error');
+            // Jika error, kembalikan status ke pending agar bisa dicek lagi
             updateModalStatus('pending');
         }
     });
@@ -291,21 +298,21 @@ document.addEventListener('DOMContentLoaded', () => {
         const savedTheme = localStorage.getItem('theme_preference_v1') || 'light';
         applyTheme(savedTheme);
         renderSitesList();
-        await fetchDomains();
         
-        // --- LOGIKA BARU UNTUK DURASI MINIMAL LOADING ---
-        const minimumLoadingTime = 1500; // dalam milidetik (1.5 detik)
-        const elapsedTime = performance.now() - startTime;
-        const remainingTime = minimumLoadingTime - elapsedTime;
+        try {
+            await fetchDomains();
+        } catch(error) {
+            console.error("Inisialisasi gagal:", error);
+            showToast("Gagal memuat komponen halaman.", "error");
+        } finally {
+            // MODIFIKASI: Logika loading screen dipindah ke 'finally'
+            const minimumLoadingTime = 1500;
+            const elapsedTime = performance.now() - startTime;
+            const remainingTime = minimumLoadingTime - elapsedTime;
 
-        if (remainingTime > 0) {
-            // Jika halaman memuat lebih cepat dari durasi minimal, tunggu sisa waktunya
             setTimeout(() => {
                 loadingOverlay.classList.add('hidden');
-            }, remainingTime);
-        } else {
-            // Jika halaman memuat lebih lama, langsung sembunyikan
-            loadingOverlay.classList.add('hidden');
+            }, Math.max(0, remainingTime));
         }
     };
     

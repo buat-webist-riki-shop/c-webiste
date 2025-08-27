@@ -168,38 +168,35 @@ async function handleCreateWebsite(request, response) {
         }).then(res => res.json());
         if (addDomainRes.error) throw new Error(`Vercel Domain Error: ${addDomainRes.error.message}`);
         
-        // [PERBAIKAN] Hapus asumsi lama dan ganti dengan cara yang lebih andal
-        // Langkah 1: Minta konfigurasi DNS secara eksplisit dari Vercel
-        const domainConfigUrl = VERCEL_TEAM_ID ? `https://api.vercel.com/v4/domains/${finalDomain}/config?teamId=${VERCEL_TEAM_ID}` : `https://api.vercel.com/v4/domains/${finalDomain}/config`;
-        const domainConfig = await fetch(domainConfigUrl, {
-            headers: { "Authorization": `Bearer ${VERCEL_TOKEN}` }
+        // [PERBAIKAN FINAL] Menggunakan metode A Record yang lebih stabil
+        const allDomains = JSON.parse(fs.readFileSync(path.resolve('./data/domains.json'), 'utf-8'));
+        const domainInfo = allDomains[rootDomain];
+        if (!domainInfo) throw new Error("Konfigurasi untuk domain utama tidak ditemukan.");
+
+        // Hapus record lama jika ada untuk menghindari konflik
+        const recordsRes = await fetch(`https://api.cloudflare.com/client/v4/zones/${domainInfo.zone}/dns_records?name=${finalDomain}`, {
+             headers: { "Authorization": `Bearer ${domainInfo.apitoken}` }
         }).then(res => res.json());
-
-        if (!domainConfig || !domainConfig.misconfigured) {
-            // Jika Vercel melaporkan domain sudah terkonfigurasi, kita anggap selesai.
-            // Ini bisa terjadi jika prosesnya sangat cepat.
-        } else {
-            // Langkah 2: Temukan record yang direkomendasikan Vercel (A atau CNAME)
-            const recordToCreate = domainConfig.recommendedRecords.find(r => ['A', 'CNAME'].includes(r.type));
-            if (!recordToCreate) throw new Error("Gagal mendapatkan rekomendasi DNS dari Vercel.");
-            
-            const allDomains = JSON.parse(fs.readFileSync(path.resolve('./data/domains.json'), 'utf-8'));
-            const domainInfo = allDomains[rootDomain];
-            if (!domainInfo) throw new Error("Konfigurasi untuk domain utama tidak ditemukan.");
-
-            // Langkah 3: Gunakan data dinamis dari Vercel untuk membuat record DNS di Cloudflare
-            await fetch(`https://api.cloudflare.com/client/v4/zones/${domainInfo.zone}/dns_records`, {
-                method: "POST",
-                headers: { "Authorization": `Bearer ${domainInfo.apitoken}`, "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    type: recordToCreate.type,
-                    name: subdomain,
-                    content: recordToCreate.value,
-                    proxied: false,
-                    ttl: 1
-                })
-            });
+        if (recordsRes.success && recordsRes.result.length > 0) {
+            for (const record of recordsRes.result) {
+                await fetch(`https://api.cloudflare.com/client/v4/zones/${domainInfo.zone}/dns_records/${record.id}`, {
+                    method: 'DELETE', headers: { "Authorization": `Bearer ${domainInfo.apitoken}` }
+                });
+            }
         }
+
+        // Buat A Record baru yang menunjuk ke IP Vercel
+        await fetch(`https://api.cloudflare.com/client/v4/zones/${domainInfo.zone}/dns_records`, {
+            method: "POST",
+            headers: { "Authorization": `Bearer ${domainInfo.apitoken}`, "Content-Type": "application/json" },
+            body: JSON.stringify({
+                type: 'A',
+                name: subdomain,
+                content: '76.76.21.21', // IP Address universal dari Vercel
+                proxied: false,
+                ttl: 1
+            })
+        });
         
         return response.status(200).json({ message: "Website berhasil dibuat!", url: `https://${finalDomain}` });
     } catch (error) {

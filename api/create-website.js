@@ -4,18 +4,23 @@ import formidable from "formidable";
 import AdmZip from "adm-zip";
 import fs from "fs";
 import path from "path";
+import { promises as dns } from 'dns';
 
-// --- Konfigurasi (Ambil dari Environment Variables Vercel) ---
+// --- Konfigurasi ---
 const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
 const REPO_OWNER = process.env.REPO_OWNER;
 const VERCEL_TOKEN = process.env.VERCEL_TOKEN;
 const VERCEL_TEAM_ID = process.env.VERCEL_TEAM_ID;
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 const REPO_NAME_FOR_JSON = process.env.REPO_NAME_FOR_JSON;
+const VERCEL_A_RECORD = '76.76.21.21';
 
 const octokit = new Octokit({ auth: GITHUB_TOKEN });
+const VERCEL_API_BASE = `https://api.vercel.com`;
+const VERCEL_HEADERS = { "Authorization": `Bearer ${VERCEL_TOKEN}`, "Content-Type": "application/json" };
+const TEAM_QUERY = VERCEL_TEAM_ID ? `?teamId=${VERCEL_TEAM_ID}` : '';
 
-// --- Helper GitHub ---
+// --- Helper Functions ---
 async function readJsonFromGithub(filePath) {
     try {
         const { data } = await octokit.repos.getContent({ owner: REPO_OWNER, repo: REPO_NAME_FOR_JSON, path: filePath });
@@ -38,6 +43,19 @@ async function writeJsonToGithub(filePath, json, message) {
     await octokit.repos.createOrUpdateFileContents({ owner: REPO_OWNER, repo: REPO_NAME_FOR_JSON, path: filePath, message, content, sha });
 }
 
+const getAllFiles = (dirPath, arrayOfFiles) => {
+    const files = fs.readdirSync(dirPath);
+    arrayOfFiles = arrayOfFiles || [];
+    files.forEach(file => {
+        if (fs.statSync(path.join(dirPath, file)).isDirectory()) {
+            arrayOfFiles = getAllFiles(path.join(dirPath, file), arrayOfFiles);
+        } else {
+            arrayOfFiles.push(path.join(dirPath, file));
+        }
+    });
+    return arrayOfFiles;
+};
+
 // --- Handler Utama ---
 export default async function handler(request, response) {
     if (request.method === 'GET') {
@@ -48,38 +66,62 @@ export default async function handler(request, response) {
         if (contentType.includes('multipart/form-data')) {
             return handleCreateWebsite(request, response);
         } else {
-            return handleAdminActions(request, response);
+            return handleJsonActions(request, response);
         }
     }
     return response.status(405).json({ message: 'Metode tidak diizinkan.' });
 }
 
-// --- Logika GET untuk daftar domain ---
-async function handleGetDomains(request, response) {
+// --- Logika GET ---
+async function handleGetDomains(req, res) {
     try {
         const domainsData = JSON.parse(fs.readFileSync(path.resolve('./data/domains.json'), 'utf-8'));
-        return response.status(200).json(Object.keys(domainsData));
+        return res.status(200).json(Object.keys(domainsData));
     } catch (error) {
-        return response.status(500).json({ message: "Gagal memuat daftar domain." });
+        return res.status(500).json({ message: "Gagal memuat daftar domain." });
     }
 }
 
-// --- Logika POST untuk Admin ---
-async function handleAdminActions(request, response) {
+// --- Logika POST untuk Admin, Cek Status, Cek Subdomain ---
+async function handleJsonActions(req, res) {
     try {
-        const { action, data, adminPassword } = request.body;
-        if (adminPassword !== ADMIN_PASSWORD) throw new Error("Password admin salah.");
+        const { action, data, adminPassword } = req.body;
+        
+        // Aksi publik (tidak perlu password)
+        switch(action) {
+            case 'checkDomainStatus': {
+                const { domain } = data;
+                if (!domain) return res.status(400).json({ message: "Nama domain diperlukan." });
+                try {
+                    const addresses = await dns.resolve(domain);
+                    if (addresses.includes(VERCEL_A_RECORD)) {
+                        return res.status(200).json({ status: 'success', message: 'Domain sudah terhubung dengan benar.' });
+                    }
+                } catch (err) {}
+                return res.status(200).json({ status: 'pending', message: 'Domain belum terhubung.' });
+            }
+            case 'checkSubdomain': {
+                const { subdomain, rootDomain } = data;
+                if (!subdomain || !rootDomain) return res.status(400).json({ message: "Subdomain dan domain utama diperlukan." });
+                const finalDomain = `${subdomain}.${rootDomain}`;
+                const checkRes = await fetch(`${VERCEL_API_BASE}/v4/domains/status${TEAM_QUERY}&name=${finalDomain}`, { headers: VERCEL_HEADERS });
+                const result = await checkRes.json();
+                return res.status(200).json({ available: !result.available });
+            }
+        }
+        
+        // Aksi admin (perlu password)
+        if (adminPassword !== ADMIN_PASSWORD) return res.status(403).json({ message: "Password admin salah."});
 
         const APIKEYS_PATH = "data/apikeys.json";
         let apiKeys = await readJsonFromGithub(APIKEYS_PATH);
 
         switch (action) {
             case "getApiKeys":
-                return response.status(200).json(apiKeys);
+                return res.status(200).json(apiKeys);
             case "createApiKey": {
                 const { key, duration, unit, isPermanent } = data;
-                if (!key) throw new Error("Nama API Key tidak boleh kosong.");
-                if (apiKeys[key]) throw new Error("API Key ini sudah ada.");
+                if (!key || apiKeys[key]) return res.status(400).json({ message: "Nama API Key tidak boleh kosong atau sudah ada."});
                 let expires_at = "permanent";
                 if (!isPermanent) {
                     const now = new Date();
@@ -91,20 +133,21 @@ async function handleAdminActions(request, response) {
                 }
                 apiKeys[key] = { created_at: new Date().toISOString(), expires_at };
                 await writeJsonToGithub(APIKEYS_PATH, apiKeys, `Create API Key: ${key}`);
-                return response.status(200).json({ message: `Kunci '${key}' berhasil dibuat.` });
+                return res.status(200).json({ message: `Kunci '${key}' berhasil dibuat.` });
             }
             case "deleteApiKey": {
                 const { key } = data;
-                if (!apiKeys[key]) throw new Error("API Key tidak ditemukan.");
+                if (!apiKeys[key]) return res.status(404).json({ message: "API Key tidak ditemukan."});
                 delete apiKeys[key];
                 await writeJsonToGithub(APIKEYS_PATH, apiKeys, `Delete API Key: ${key}`);
-                return response.status(200).json({ message: `Kunci '${key}' berhasil dihapus.` });
+                return res.status(200).json({ message: `Kunci '${key}' berhasil dihapus.` });
             }
             default:
-                throw new Error("Aksi admin tidak dikenal.");
+                return res.status(400).json({ message: "Aksi tidak dikenal." });
         }
     } catch (error) {
-        return response.status(500).json({ message: error.message });
+        console.error("JSON Action Error:", error);
+        return res.status(500).json({ message: error.message });
     }
 }
 
@@ -125,80 +168,76 @@ async function handleCreateWebsite(request, response) {
         }
 
         fs.mkdirSync(tempDir);
-        if (uploadedFile.mimetype === "application/zip") new AdmZip(uploadedFile.filepath).extractAllTo(tempDir, true);
-        else if (uploadedFile.mimetype === "text/html") fs.renameSync(uploadedFile.filepath, path.join(tempDir, "index.html"));
-        else throw new Error("Format file tidak didukung. Harap unggah .zip atau .html.");
-        if (!fs.existsSync(path.join(tempDir, "index.html"))) throw new Error("File 'index.html' tidak ditemukan.");
+        if (uploadedFile.mimetype === "application/zip") {
+            const zip = new AdmZip(uploadedFile.filepath);
+            zip.extractAllTo(tempDir, true);
+        } else if (uploadedFile.mimetype === "text/html") {
+            fs.renameSync(uploadedFile.filepath, path.join(tempDir, "index.html"));
+        } else throw new Error("Format file tidak didukung.");
+        
+        let uploadRoot = tempDir;
+        const entries = fs.readdirSync(tempDir);
+        if (entries.length === 1 && fs.statSync(path.join(tempDir, entries[0])).isDirectory()) {
+            uploadRoot = path.join(tempDir, entries[0]);
+        }
+        
+        if (!fs.existsSync(path.join(uploadRoot, "index.html"))) {
+            throw new Error("File 'index.html' tidak ditemukan di dalam root file yang diunggah.");
+        }
 
         const repoName = `${subdomain.replace(/[^a-z0-9-]/gi, '')}-${Math.floor(100 + Math.random() * 900)}`;
         await octokit.repos.createForAuthenticatedUser({ name: repoName, private: true });
         
-        const filesToUpload = fs.readdirSync(tempDir);
-        for (const file of filesToUpload) {
-            const content = fs.readFileSync(path.join(tempDir, file), "base64");
-            await octokit.repos.createOrUpdateFileContents({ owner: REPO_OWNER, repo: repoName, path: file, message: `Initial commit`, content });
+        const allFiles = getAllFiles(uploadRoot);
+        for (const filePath of allFiles) {
+            const content = fs.readFileSync(filePath, "base64");
+            const githubPath = path.relative(uploadRoot, filePath).replace(/\\/g, "/");
+            await octokit.repos.createOrUpdateFileContents({
+                owner: REPO_OWNER, repo: repoName, path: githubPath,
+                message: `Initial commit: ${githubPath}`, content
+            });
         }
         
-        const vercelApiUrl = VERCEL_TEAM_ID ? `https://api.vercel.com/v9/projects?teamId=${VERCEL_TEAM_ID}` : `https://api.vercel.com/v9/projects`;
-        const vercelProject = await fetch(vercelApiUrl, {
-            method: "POST", headers: { "Authorization": `Bearer ${VERCEL_TOKEN}`, "Content-Type": "application/json" },
-            body: JSON.stringify({
-                name: repoName,
-                gitRepository: { type: "github", repo: `${REPO_OWNER}/${repoName}` },
-                framework: null
-            })
+        const vercelProject = await fetch(`${VERCEL_API_BASE}/v9/projects${TEAM_QUERY}`, {
+            method: "POST", headers: VERCEL_HEADERS,
+            body: JSON.stringify({ name: repoName, gitRepository: { type: "github", repo: `${REPO_OWNER}/${repoName}` }, framework: null })
         }).then(res => res.json());
         if (vercelProject.error) throw new Error(`Vercel Error: ${vercelProject.error.message}`);
         
-        const triggerDeployUrl = VERCEL_TEAM_ID ? `https://api.vercel.com/v13/deployments?teamId=${VERCEL_TEAM_ID}` : `https://api.vercel.com/v13/deployments`;
-        await fetch(triggerDeployUrl, {
-            method: 'POST',
-            headers: { "Authorization": `Bearer ${VERCEL_TOKEN}`, "Content-Type": "application/json" },
-            body: JSON.stringify({
-                name: repoName,
-                gitSource: { type: 'github', repoId: vercelProject.link.repoId, ref: 'main' },
-                target: 'production'
-            })
-        }).then(res => res.json());
+        const vercelUrl = vercelProject.alias.find(a => a.domain.endsWith('.vercel.app')).domain;
+        
+        await fetch(`${VERCEL_API_BASE}/v13/deployments${TEAM_QUERY}`, {
+            method: 'POST', headers: VERCEL_HEADERS,
+            body: JSON.stringify({ name: repoName, gitSource: { type: 'github', repoId: vercelProject.link.repoId, ref: 'main' }, target: 'production' })
+        });
 
         const finalDomain = `${subdomain}.${rootDomain}`;
-        const addDomainRes = await fetch(`https://api.vercel.com/v10/projects/${repoName}/domains${VERCEL_TEAM_ID ? `?teamId=${VERCEL_TEAM_ID}` : ''}`, {
-            method: "POST", headers: { "Authorization": `Bearer ${VERCEL_TOKEN}`, "Content-Type": "application/json" },
+        await fetch(`${VERCEL_API_BASE}/v10/projects/${repoName}/domains${TEAM_QUERY}`, {
+            method: "POST", headers: VERCEL_HEADERS,
             body: JSON.stringify({ name: finalDomain })
-        }).then(res => res.json());
-        if (addDomainRes.error) throw new Error(`Vercel Domain Error: ${addDomainRes.error.message}`);
+        });
         
-        // [PERBAIKAN FINAL] Menggunakan metode A Record yang lebih stabil
         const allDomains = JSON.parse(fs.readFileSync(path.resolve('./data/domains.json'), 'utf-8'));
         const domainInfo = allDomains[rootDomain];
         if (!domainInfo) throw new Error("Konfigurasi untuk domain utama tidak ditemukan.");
-
-        // Hapus record lama jika ada untuk menghindari konflik
-        const recordsRes = await fetch(`https://api.cloudflare.com/client/v4/zones/${domainInfo.zone}/dns_records?name=${finalDomain}`, {
-             headers: { "Authorization": `Bearer ${domainInfo.apitoken}` }
-        }).then(res => res.json());
+        
+        const cfAuthHeader = { "Authorization": `Bearer ${domainInfo.apitoken}` };
+        const recordsRes = await fetch(`https://api.cloudflare.com/client/v4/zones/${domainInfo.zone}/dns_records?name=${finalDomain}`, { headers: cfAuthHeader }).then(res => res.json());
         if (recordsRes.success && recordsRes.result.length > 0) {
             for (const record of recordsRes.result) {
-                await fetch(`https://api.cloudflare.com/client/v4/zones/${domainInfo.zone}/dns_records/${record.id}`, {
-                    method: 'DELETE', headers: { "Authorization": `Bearer ${domainInfo.apitoken}` }
-                });
+                await fetch(`https://api.cloudflare.com/client/v4/zones/${domainInfo.zone}/dns_records/${record.id}`, { method: 'DELETE', headers: cfAuthHeader });
             }
         }
 
-        // Buat A Record baru yang menunjuk ke IP Vercel
         await fetch(`https://api.cloudflare.com/client/v4/zones/${domainInfo.zone}/dns_records`, {
-            method: "POST",
-            headers: { "Authorization": `Bearer ${domainInfo.apitoken}`, "Content-Type": "application/json" },
-            body: JSON.stringify({
-                type: 'A',
-                name: subdomain,
-                content: '76.76.21.21', // IP Address universal dari Vercel
-                proxied: false,
-                ttl: 1
-            })
+            method: "POST", headers: { ...cfAuthHeader, "Content-Type": "application/json" },
+            body: JSON.stringify({ type: 'A', name: subdomain, content: VERCEL_A_RECORD, proxied: false, ttl: 1 })
         });
         
-        return response.status(200).json({ message: "Website berhasil dibuat!", url: `https://${finalDomain}` });
+        return response.status(200).json({
+            message: "Proses pembuatan website dimulai!",
+            siteData: { projectName: repoName, vercelUrl: `https://${vercelUrl}`, customUrl: `https://${finalDomain}`, status: 'pending' }
+        });
     } catch (error) {
         console.error("Create Website Error:", error);
         return response.status(500).json({ message: error.message });

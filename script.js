@@ -1,4 +1,5 @@
 document.addEventListener('DOMContentLoaded', () => {
+    // Tandai waktu mulai saat script pertama kali dijalankan
     const startTime = performance.now();
 
     // Elemen UI
@@ -9,22 +10,26 @@ document.addEventListener('DOMContentLoaded', () => {
     const fileNameSpan = document.getElementById('file-name-span');
     const userApiKeyInput = document.getElementById('user-api-key');
     const createBtn = document.getElementById('create-btn');
+    const btnText = document.getElementById('btn-text');
     const sitesContainer = document.getElementById('created-sites-container');
     const sitesList = document.getElementById('sites-list');
     const subdomainStatus = document.getElementById('subdomain-status');
     
+    // Elemen Modal
     const detailsModal = document.getElementById('details-modal');
     const modalCloseBtn = document.getElementById('modal-close-btn');
     const modalVercelUrl = document.getElementById('modal-vercel-url');
     const modalCustomUrl = document.getElementById('modal-custom-url');
     const modalCheckStatusBtn = document.getElementById('modal-check-status-btn');
 
+    // Elemen Tema & Loading
     const themeToggle = document.getElementById('theme-toggle');
     const loadingOverlay = document.getElementById('loading-overlay');
     const body = document.body;
     let debounceTimer;
     let toastTimeout;
 
+    // --- NOTIFIKASI, TEMA, & LOADING ---
     const showToast = (message, type = 'info') => {
         const toast = document.getElementById('toast-notification');
         clearTimeout(toastTimeout);
@@ -33,13 +38,17 @@ document.addEventListener('DOMContentLoaded', () => {
         toast.className = '';
         toast.classList.add(type);
         toast.classList.add('show');
-        toastTimeout = setTimeout(() => { toast.classList.remove('show'); }, 4000); // Durasi notif lebih lama
+        toastTimeout = setTimeout(() => { toast.classList.remove('show'); }, 3000);
     };
 
     const applyTheme = (theme) => {
-        if (theme === 'dark') body.classList.add('dark-mode');
-        else body.classList.remove('dark-mode');
-        themeToggle.innerHTML = theme === 'dark' ? '<i class="fas fa-sun"></i>' : '<i class="fas fa-moon"></i>';
+        if (theme === 'dark') {
+            body.classList.add('dark-mode');
+            themeToggle.innerHTML = '<i class="fas fa-sun"></i>';
+        } else {
+            body.classList.remove('dark-mode');
+            themeToggle.innerHTML = '<i class="fas fa-moon"></i>';
+        }
     };
     
     themeToggle.addEventListener('click', () => {
@@ -48,6 +57,7 @@ document.addEventListener('DOMContentLoaded', () => {
         applyTheme(newTheme);
     });
 
+    // --- MANAJEMEN DATA (localStorage) ---
     const getSites = () => JSON.parse(localStorage.getItem('createdSites_v1')) || [];
     const saveSite = (siteData) => {
         const sites = getSites();
@@ -60,14 +70,18 @@ document.addEventListener('DOMContentLoaded', () => {
         if (siteIndex > -1) {
             sites[siteIndex].status = newStatus;
             localStorage.setItem('createdSites_v1', JSON.stringify(sites));
-            return sites[siteIndex];
         }
-        return null;
+        return sites[siteIndex];
     };
 
+    // --- FUNGSI TAMPILAN (RENDER) ---
     const renderSitesList = () => {
         const sites = getSites();
-        sitesContainer.style.display = sites.length > 0 ? 'block' : 'none';
+        if (sites.length === 0) {
+            sitesContainer.style.display = 'none';
+            return;
+        }
+        sitesContainer.style.display = 'block';
         sitesList.innerHTML = '';
         sites.forEach(site => {
             const item = document.createElement('div');
@@ -96,12 +110,16 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const updateModalStatus = (status) => {
-        modalCheckStatusBtn.disabled = status === 'success';
-        modalCheckStatusBtn.className = `check-status-btn status ${status}`;
-        if(status === 'success') {
-             modalCheckStatusBtn.innerHTML = 'Aktif';
+        modalCheckStatusBtn.disabled = false;
+        modalCheckStatusBtn.innerHTML = '<i class="fas fa-sync-alt"></i> <span id="modal-status-text">Cek Status</span>';
+        
+        if (status === 'success') {
+            modalCheckStatusBtn.className = 'status success';
+            modalCheckStatusBtn.textContent = 'Aktif';
+            modalCheckStatusBtn.disabled = true;
         } else {
-             modalCheckStatusBtn.innerHTML = '<i class="fas fa-sync-alt"></i> Cek Status';
+            modalCheckStatusBtn.className = 'check-status-btn status pending';
+            modalCheckStatusBtn.innerHTML = '<i class="fas fa-sync-alt"></i> <span id="modal-status-text">Cek Status</span>';
         }
     };
 
@@ -110,21 +128,33 @@ document.addEventListener('DOMContentLoaded', () => {
             const response = await fetch('/api/create-website');
             if (!response.ok) throw new Error('Gagal memuat domain');
             const domains = await response.json();
-            rootDomainSelect.innerHTML = domains.length > 0 
-                ? domains.map(d => `<option value="${d}">.${d}</option>`).join('')
-                : '<option value="">Tidak ada domain</option>';
-            if(domains.length === 0) showToast('Admin belum menambahkan domain utama.', 'error');
+
+            rootDomainSelect.innerHTML = '';
+            if (domains.length > 0) {
+                domains.forEach(domain => {
+                    const option = document.createElement('option');
+                    option.value = domain;
+                    option.textContent = `.${domain}`;
+                    rootDomainSelect.appendChild(option);
+                });
+            } else {
+                 rootDomainSelect.innerHTML = '<option value="">Tidak ada domain</option>';
+                 showToast('Admin belum menambahkan domain utama.', 'error');
+            }
         } catch (error) {
             console.error(error);
             rootDomainSelect.innerHTML = '<option value="">Error memuat</option>';
         }
     };
     
+    // --- VALIDASI & INTERAKSI FORM ---
     const checkSubdomainAvailability = async () => {
         const subdomain = subdomainInput.value;
         const rootDomain = rootDomainSelect.value;
-        if (!subdomain || !rootDomain) return (subdomainStatus.textContent = '');
-        
+        if (!subdomain || !rootDomain) {
+            subdomainStatus.textContent = '';
+            return;
+        }
         subdomainStatus.textContent = 'Memeriksa...';
         subdomainStatus.className = '';
 
@@ -137,8 +167,13 @@ document.addEventListener('DOMContentLoaded', () => {
             const result = await response.json();
             if (!response.ok) throw new Error(result.message);
 
-            subdomainStatus.textContent = result.available ? 'Tersedia' : 'Sudah Digunakan';
-            subdomainStatus.className = result.available ? 'available' : 'taken';
+            if (result.available) {
+                subdomainStatus.textContent = 'Tersedia';
+                subdomainStatus.className = 'available';
+            } else {
+                subdomainStatus.textContent = 'Sudah Digunakan';
+                subdomainStatus.className = 'taken';
+            }
         } catch (error) {
             subdomainStatus.textContent = 'Error';
             subdomainStatus.className = 'taken';
@@ -146,13 +181,27 @@ document.addEventListener('DOMContentLoaded', () => {
     };
     
     subdomainInput.addEventListener('input', (e) => {
-        e.target.value = e.target.value.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+        const originalValue = e.target.value;
+        const formattedValue = originalValue.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+        if (originalValue !== formattedValue) {
+            e.target.value = formattedValue;
+        }
+        
         clearTimeout(debounceTimer);
-        debounceTimer = setTimeout(() => e.target.value && checkSubdomainAvailability(), 500);
+        debounceTimer = setTimeout(() => {
+            if (e.target.value) { // Hanya cek jika input tidak kosong
+                checkSubdomainAvailability();
+            } else {
+                subdomainStatus.textContent = '';
+            }
+        }, 500);
     });
     
     rootDomainSelect.addEventListener('change', checkSubdomainAvailability);
-    websiteFileInput.addEventListener('change', () => fileNameSpan.textContent = websiteFileInput.files[0]?.name || 'Pilih file...');
+
+    websiteFileInput.addEventListener('change', () => {
+        fileNameSpan.textContent = websiteFileInput.files.length > 0 ? websiteFileInput.files[0].name : 'Pilih file...';
+    });
 
     creatorForm.addEventListener('submit', async (e) => {
         e.preventDefault();
@@ -161,7 +210,10 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         createBtn.disabled = true;
-        createBtn.innerHTML = `<div class="spinner"></div><span id="btn-text">Memproses...</span>`;
+        btnText.textContent = 'Memproses...';
+        const spinner = document.createElement('div');
+        spinner.className = 'spinner';
+        createBtn.prepend(spinner);
 
         const formData = new FormData();
         formData.append('subdomain', subdomainInput.value.trim());
@@ -181,21 +233,28 @@ document.addEventListener('DOMContentLoaded', () => {
             fileNameSpan.textContent = 'Pilih file...';
             subdomainStatus.textContent = '';
             showToast('Website berhasil dibuat!', 'success');
+
         } catch (error) {
             showToast(`Gagal: ${error.message}`, 'error');
         } finally {
             createBtn.disabled = false;
-            createBtn.innerHTML = `<span id="btn-text">Buat Website</span>`;
+            btnText.textContent = 'Buat Website';
+            spinner.remove();
         }
     });
 
     modalCloseBtn.addEventListener('click', () => detailsModal.classList.remove('show'));
-    detailsModal.addEventListener('click', (e) => e.target === detailsModal && detailsModal.classList.remove('show'));
+    detailsModal.addEventListener('click', (e) => {
+        if(e.target === detailsModal) {
+            detailsModal.classList.remove('show');
+        }
+    });
 
     sitesList.addEventListener('click', (e) => {
         const item = e.target.closest('.sites-list-item');
         if (!item) return;
-        const siteData = getSites().find(s => s.projectName === item.dataset.project);
+        const sites = getSites();
+        const siteData = sites.find(s => s.projectName === item.dataset.project);
         if (siteData) showDetailsModal(siteData);
     });
 
@@ -216,35 +275,37 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!response.ok) throw new Error(result.message);
             
             const updatedSite = updateSiteStatus(project, result.status);
-            if (updatedSite) updateModalStatus(updatedSite.status);
+            if(updatedSite) updateModalStatus(updatedSite.status);
             
             renderSitesList();
             showToast(result.message, result.status);
+
         } catch (error) {
             showToast(error.message, 'error');
-            updateModalStatus('pending'); // Jika error, kembalikan ke status pending
+            updateModalStatus('pending');
         }
     });
     
-    // --- INISIALISASI HALAMAN ---
+    // --- INISIALISASI ---
     const initializePage = async () => {
-        try {
-            const savedTheme = localStorage.getItem('theme_preference_v1') || 'light';
-            applyTheme(savedTheme);
-            renderSitesList();
-            await fetchDomains();
-        } catch (error) {
-            console.error("Initialization failed:", error);
-            showToast("Gagal memuat data penting.", "error");
-        } finally {
-            // Logika untuk durasi minimal loading
-            const minimumLoadingTime = 1500;
-            const elapsedTime = performance.now() - startTime;
-            const remainingTime = minimumLoadingTime - elapsedTime;
+        const savedTheme = localStorage.getItem('theme_preference_v1') || 'light';
+        applyTheme(savedTheme);
+        renderSitesList();
+        await fetchDomains();
+        
+        // --- LOGIKA BARU UNTUK DURASI MINIMAL LOADING ---
+        const minimumLoadingTime = 1500; // dalam milidetik (1.5 detik)
+        const elapsedTime = performance.now() - startTime;
+        const remainingTime = minimumLoadingTime - elapsedTime;
 
+        if (remainingTime > 0) {
+            // Jika halaman memuat lebih cepat dari durasi minimal, tunggu sisa waktunya
             setTimeout(() => {
                 loadingOverlay.classList.add('hidden');
-            }, remainingTime > 0 ? remainingTime : 0);
+            }, remainingTime);
+        } else {
+            // Jika halaman memuat lebih lama, langsung sembunyikan
+            loadingOverlay.classList.add('hidden');
         }
     };
     

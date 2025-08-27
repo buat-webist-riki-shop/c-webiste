@@ -1,4 +1,7 @@
 document.addEventListener('DOMContentLoaded', () => {
+    // Tandai waktu mulai saat script pertama kali dijalankan
+    const startTime = performance.now();
+
     // Elemen UI
     const creatorForm = document.getElementById('creator-form');
     const subdomainInput = document.getElementById('subdomain-name');
@@ -19,13 +22,14 @@ document.addEventListener('DOMContentLoaded', () => {
     const modalCustomUrl = document.getElementById('modal-custom-url');
     const modalCheckStatusBtn = document.getElementById('modal-check-status-btn');
 
-    // Elemen Tema
+    // Elemen Tema & Loading
     const themeToggle = document.getElementById('theme-toggle');
+    const loadingOverlay = document.getElementById('loading-overlay');
     const body = document.body;
     let debounceTimer;
     let toastTimeout;
 
-    // --- NOTIFIKASI & TEMA ---
+    // --- NOTIFIKASI, TEMA, & LOADING ---
     const showToast = (message, type = 'info') => {
         const toast = document.getElementById('toast-notification');
         clearTimeout(toastTimeout);
@@ -180,13 +184,16 @@ document.addEventListener('DOMContentLoaded', () => {
         const originalValue = e.target.value;
         const formattedValue = originalValue.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
         if (originalValue !== formattedValue) {
-            showToast('Hanya huruf kecil, angka, dan strip (-) yang diizinkan.', 'info');
+            e.target.value = formattedValue;
         }
-        e.target.value = formattedValue;
         
         clearTimeout(debounceTimer);
         debounceTimer = setTimeout(() => {
-            checkSubdomainAvailability();
+            if (e.target.value) { // Hanya cek jika input tidak kosong
+                checkSubdomainAvailability();
+            } else {
+                subdomainStatus.textContent = '';
+            }
         }, 500);
     });
     
@@ -267,8 +274,9 @@ document.addEventListener('DOMContentLoaded', () => {
             const result = await response.json();
             if (!response.ok) throw new Error(result.message);
             
-            updateSiteStatus(project, result.status);
-            updateModalStatus(result.status);
+            const updatedSite = updateSiteStatus(project, result.status);
+            if(updatedSite) updateModalStatus(updatedSite.status);
+            
             renderSitesList();
             showToast(result.message, result.status);
 
@@ -279,8 +287,27 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     
     // --- INISIALISASI ---
-    const savedTheme = localStorage.getItem('theme_preference_v1') || 'light';
-    applyTheme(savedTheme);
-    renderSitesList();
-    fetchDomains();
+    const initializePage = async () => {
+        const savedTheme = localStorage.getItem('theme_preference_v1') || 'light';
+        applyTheme(savedTheme);
+        renderSitesList();
+        await fetchDomains();
+        
+        // --- LOGIKA BARU UNTUK DURASI MINIMAL LOADING ---
+        const minimumLoadingTime = 1500; // dalam milidetik (1.5 detik)
+        const elapsedTime = performance.now() - startTime;
+        const remainingTime = minimumLoadingTime - elapsedTime;
+
+        if (remainingTime > 0) {
+            // Jika halaman memuat lebih cepat dari durasi minimal, tunggu sisa waktunya
+            setTimeout(() => {
+                loadingOverlay.classList.add('hidden');
+            }, remainingTime);
+        } else {
+            // Jika halaman memuat lebih lama, langsung sembunyikan
+            loadingOverlay.classList.add('hidden');
+        }
+    };
+    
+    initializePage();
 });

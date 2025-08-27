@@ -87,18 +87,23 @@ async function handleJsonActions(req, res) {
     try {
         const { action, data, adminPassword } = req.body;
         
-        // Aksi publik (tidak perlu password)
         switch(action) {
             case 'checkDomainStatus': {
                 const { domain } = data;
                 if (!domain) return res.status(400).json({ message: "Nama domain diperlukan." });
                 try {
-                    const addresses = await dns.resolve(domain);
-                    if (addresses.includes(VERCEL_A_RECORD)) {
-                        return res.status(200).json({ status: 'success', message: 'Domain sudah terhubung dengan benar.' });
+                    const projectRes = await fetch(`${VERCEL_API_BASE}/v9/projects/${domain}${TEAM_QUERY}`, { headers: VERCEL_HEADERS }).then(r => r.json());
+                    if (projectRes.error) throw new Error();
+
+                    const domainConfig = projectRes.targets.production.alias.find(a => a === domain);
+                    if(domainConfig) {
+                         const domainInfo = await fetch(`${VERCEL_API_BASE}/v5/domains/${domain}/config${TEAM_QUERY}`, { headers: VERCEL_HEADERS }).then(r => r.json());
+                         if(domainInfo.configuredBy) {
+                            return res.status(200).json({ status: 'success', message: 'Domain sudah terhubung dengan benar.' });
+                         }
                     }
                 } catch (err) {}
-                return res.status(200).json({ status: 'pending', message: 'Domain belum terhubung.' });
+                return res.status(200).json({ status: 'pending', message: 'Domain belum terhubung atau masih dalam proses.' });
             }
             case 'checkSubdomain': {
                 const { subdomain, rootDomain } = data;
@@ -110,7 +115,6 @@ async function handleJsonActions(req, res) {
             }
         }
         
-        // Aksi admin (perlu password)
         if (adminPassword !== ADMIN_PASSWORD) return res.status(403).json({ message: "Password admin salah."});
 
         const APIKEYS_PATH = "data/apikeys.json";
@@ -159,8 +163,15 @@ async function handleCreateWebsite(request, response) {
         const [fields, files] = await form.parse(request);
         const { subdomain, rootDomain, apiKey } = Object.fromEntries(Object.entries(fields).map(([k, v]) => [k, v[0]]));
         const uploadedFile = files.websiteFile[0];
+
         if (!subdomain || !rootDomain || !apiKey || !uploadedFile) throw new Error("Semua kolom wajib diisi.");
 
+        // Cek apakah nama proyek (subdomain) sudah ada di Vercel
+        const projectCheck = await fetch(`${VERCEL_API_BASE}/v9/projects/${subdomain}${TEAM_QUERY}`, { headers: VERCEL_HEADERS });
+        if(projectCheck.ok) {
+            throw new Error(`Nama website '${subdomain}' sudah digunakan. Harap gunakan nama lain.`);
+        }
+        
         const validApiKeys = await readJsonFromGithub("data/apikeys.json");
         const keyData = validApiKeys[apiKey];
         if (!keyData || (keyData.expires_at !== "permanent" && new Date() > new Date(keyData.expires_at))) {
@@ -184,8 +195,8 @@ async function handleCreateWebsite(request, response) {
         if (!fs.existsSync(path.join(uploadRoot, "index.html"))) {
             throw new Error("File 'index.html' tidak ditemukan di dalam root file yang diunggah.");
         }
-
-        const repoName = `${subdomain.replace(/[^a-z0-9-]/gi, '')}-${Math.floor(100 + Math.random() * 900)}`;
+        
+        const repoName = `${subdomain}-${Math.floor(100 + Math.random() * 900)}`;
         await octokit.repos.createForAuthenticatedUser({ name: repoName, private: true });
         
         const allFiles = getAllFiles(uploadRoot);
@@ -198,24 +209,23 @@ async function handleCreateWebsite(request, response) {
             });
         }
         
+        const vercelProjectName = subdomain; // Nama proyek di Vercel bersih tanpa angka
         const vercelProject = await fetch(`${VERCEL_API_BASE}/v9/projects${TEAM_QUERY}`, {
-            method: "POST", headers: VERCEL_HEADERS,
-            body: JSON.stringify({ name: repoName, gitRepository: { type: "github", repo: `${REPO_OWNER}/${repoName}` }, framework: null })
+            method: "POST", headers: VercEL_HEADERS,
+            body: JSON.stringify({ name: vercelProjectName, gitRepository: { type: "github", repo: `${REPO_OWNER}/${repoName}` }, framework: null })
         }).then(res => res.json());
 
         if (vercelProject.error) throw new Error(`Vercel Error: ${vercelProject.error.message}`);
         
-        // --- PERBAIKAN DI SINI ---
-        // Kita buat URL-nya sendiri karena lebih aman daripada membaca dari 'alias'
-        const vercelUrl = `${repoName}.vercel.app`;
+        const vercelUrl = `${vercelProjectName}.vercel.app`;
         
         await fetch(`${VERCEL_API_BASE}/v13/deployments${TEAM_QUERY}`, {
             method: 'POST', headers: VERCEL_HEADERS,
-            body: JSON.stringify({ name: repoName, gitSource: { type: 'github', repoId: vercelProject.link.repoId, ref: 'main' }, target: 'production' })
+            body: JSON.stringify({ name: vercelProjectName, gitSource: { type: 'github', repoId: vercelProject.link.repoId, ref: 'main' }, target: 'production' })
         });
 
         const finalDomain = `${subdomain}.${rootDomain}`;
-        await fetch(`${VERCEL_API_BASE}/v10/projects/${repoName}/domains${TEAM_QUERY}`, {
+        await fetch(`${VERCEL_API_BASE}/v10/projects/${vercelProjectName}/domains${TEAM_QUERY}`, {
             method: "POST", headers: VERCEL_HEADERS,
             body: JSON.stringify({ name: finalDomain })
         });
@@ -239,7 +249,7 @@ async function handleCreateWebsite(request, response) {
         
         return response.status(200).json({
             message: "Proses pembuatan website dimulai!",
-            siteData: { projectName: repoName, vercelUrl: `https://${vercelUrl}`, customUrl: `https://${finalDomain}`, status: 'pending' }
+            siteData: { projectName: vercelProjectName, vercelUrl: `https://${vercelUrl}`, customUrl: `https://${finalDomain}`, status: 'pending' }
         });
     } catch (error) {
         console.error("Create Website Error:", error);

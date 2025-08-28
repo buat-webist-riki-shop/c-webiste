@@ -24,6 +24,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const cloudflareModal = document.getElementById('cloudflare-modal');
     const cloudflareModalTitle = document.getElementById('cloudflare-modal-title');
     const cloudflareModalBody = document.getElementById('cloudflare-modal-body');
+    const cfSuccessModal = document.getElementById('cf-success-modal');
+    const cfSuccessMessage = document.getElementById('cf-success-message');
+    const cfNameserverList = document.getElementById('cf-nameserver-list');
+    const cfSuccessOkBtn = document.getElementById('cf-success-ok-btn');
     
     let apiKeyTextToCopy = '';
 
@@ -137,6 +141,17 @@ ${notes}`;
     };
     
     // === Logika Cloudflare ===
+    const showCloudflareSuccessPopup = (data) => {
+        cfSuccessMessage.innerHTML = `Domain <strong>${data.domain}</strong> berhasil ditambahkan ke akun Cloudflare Anda.`;
+        cfNameserverList.innerHTML = data.nameservers.map(ns => `
+            <li class="nameserver-item">
+                <span>${ns}</span>
+                <button class="copy-ns-btn" data-ns="${ns}">Copy</button>
+            </li>
+        `).join('');
+        openModal(cfSuccessModal);
+    };
+
     const setupBulkDeleteControls = (container, listType, context) => {
         const selectAllCheckbox = container.querySelector('.select-all-checkbox');
         const checkboxes = container.querySelectorAll('.item-checkbox');
@@ -144,7 +159,7 @@ ${notes}`;
 
         const updateButtonVisibility = () => {
             const checkedCount = container.querySelectorAll('.item-checkbox:checked').length;
-            bulkDeleteBtn.style.display = checkedCount > 0 ? 'inline-block' : 'none';
+            bulkDeleteBtn.style.display = checkedCount > 0 ? 'inline-flex' : 'none';
             bulkDeleteBtn.textContent = `Hapus ${checkedCount} Item Terpilih`;
         };
 
@@ -208,10 +223,16 @@ ${notes}`;
 
         cloudflareModalBody.innerHTML = `
             <div class="list-toolbar">
-                <input type="checkbox" class="select-all-checkbox"> <span style="margin-left: -5px; margin-right: auto;">Pilih Semua</span>
+                <form id="add-domain-form" class="add-domain-form">
+                    <input type="text" id="new-domain-name" placeholder="Masukkan domain baru..." required>
+                    <button type="submit">Tambah</button>
+                </form>
+            </div>
+            <div class="list-toolbar">
+                <input type="checkbox" class="select-all-checkbox"> <span style="margin-left: -5px;">Pilih Semua</span>
                 <button class="bulk-delete-btn">Hapus Item Terpilih</button>
             </div>
-            <ul class="list-item-container">${listHtml}</ul>
+            <ul class="list-item-container">${zones.length > 0 ? listHtml : '<li>Tidak ada zona ditemukan.</li>'}</ul>
         `;
         setupBulkDeleteControls(cloudflareModalBody, 'zones');
     };
@@ -231,7 +252,7 @@ ${notes}`;
         cloudflareModalBody.innerHTML = `
             <div class="list-toolbar">
                  <button id="cloudflare-modal-back-btn">&larr; Kembali</button>
-                 <input type="checkbox" class="select-all-checkbox"> <span style="margin-left: -5px; margin-right: auto;">Pilih Semua</span>
+                 <input type="checkbox" class="select-all-checkbox"> <span style="margin-left: -5px;">Pilih Semua</span>
                  <button class="bulk-delete-btn">Hapus Item Terpilih</button>
             </div>
             <ul class="list-item-container">${records.length > 0 ? listHtml : '<li>Tidak ada record DNS.</li>'}</ul>
@@ -395,7 +416,40 @@ ${notes}`;
         }
     });
     
-    cloudflareModalBody.addEventListener('click', (e) => {
+    cfSuccessOkBtn.addEventListener('click', () => {
+        closeModal(cfSuccessModal);
+        manageDomainsBtn.click();
+    });
+
+    cfNameserverList.addEventListener('click', (e) => {
+        if (e.target.classList.contains('copy-ns-btn')) {
+            const ns = e.target.dataset.ns;
+            navigator.clipboard.writeText(ns).then(() => {
+                e.target.textContent = 'Tersalin!';
+                setTimeout(() => { e.target.textContent = 'Copy'; }, 2000);
+            });
+        }
+    });
+
+    cloudflareModalBody.addEventListener('click', async (e) => {
+        if (e.target.closest('#add-domain-form')) {
+            e.preventDefault();
+            const form = e.target.closest('#add-domain-form');
+            const input = form.querySelector('#new-domain-name');
+            const button = form.querySelector('button');
+            const domainName = input.value.trim();
+            if (!domainName) return showNotification('Nama domain tidak boleh kosong.', 'error');
+            button.textContent = 'Menambahkan...'; button.disabled = true;
+            try {
+                const result = await callApi('addCloudflareZone', { domainName });
+                showCloudflareSuccessPopup(result);
+                input.value = '';
+            } catch (error) {
+                showNotification(error.message, 'error');
+            } finally {
+                button.textContent = 'Tambah'; button.disabled = false;
+            }
+        }
         if (e.target.classList.contains('manage-dns-btn')) {
             showDnsRecordsView(e.target.dataset.zoneId, e.target.dataset.zoneName);
         }

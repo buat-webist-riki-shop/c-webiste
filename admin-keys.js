@@ -19,6 +19,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const apiKeySuccessModal = document.getElementById('apikey-success-modal');
     const apiKeyDetailsContainer = document.getElementById('apikey-details-container');
     const apiKeySuccessOkBtn = document.getElementById('apikey-success-ok-btn');
+    // BARU: Elemen tombol copy
+    const apiKeyCopyBtn = document.getElementById('apikey-copy-btn');
+    
+    // Variabel untuk menyimpan teks yang akan di-copy
+    let apiKeyTextToCopy = '';
 
     // === Logika Notifikasi Estetis ===
     let notificationTimeout;
@@ -51,11 +56,13 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     };
 
+    // DIUBAH: Fungsi ini sekarang juga menyiapkan teks untuk di-copy
     const showApiKeySuccessPopup = (newKey) => {
         const formatDate = (isoString) => new Date(isoString).toLocaleString('id-ID', {
             day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit'
         });
         const expiryText = newKey.expires_at === 'permanent' ? 'Permanen' : formatDate(newKey.expires_at);
+        
         apiKeyDetailsContainer.innerHTML = `
             <div class="detail-item">
                 <span class="detail-label">Kunci API</span>
@@ -69,6 +76,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 <span class="detail-label">Kadaluwarsa</span>
                 <span class="detail-value">${expiryText}</span>
             </div>`;
+
+        // Siapkan teks untuk disalin
+        apiKeyTextToCopy = `Kunci API: ${newKey.name}\nDibuat Pada: ${formatDate(newKey.created_at)}\nKadaluwarsa Pada: ${expiryText}`;
+        
         openModal(apiKeySuccessModal);
     };
 
@@ -90,14 +101,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const renderApiKeys = (keys) => {
         keyListContainer.innerHTML = '';
         if (Object.keys(keys).length === 0) {
-            keyListContainer.innerHTML = '<p>Belum ada API Key yang dibuat.</p>';
-            return;
+            keyListContainer.innerHTML = '<p>Belum ada API Key yang dibuat.</p>'; return;
         }
         for (const key in keys) {
             const keyData = keys[key];
-            const expiry = keyData.expires_at === 'permanent' 
-                ? 'Permanen' 
-                : `Kadaluwarsa: ${new Date(keyData.expires_at).toLocaleDateString('id-ID')}`;
+            const expiry = keyData.expires_at === 'permanent' ? 'Permanen' : `Kadaluwarsa: ${new Date(keyData.expires_at).toLocaleDateString('id-ID')}`;
             const item = document.createElement('div');
             item.className = 'key-item';
             item.innerHTML = `<div class="key-info"><span class="key-name">${key}</span><span class="key-expiry">${expiry}</span></div><button class="delete-btn" data-key="${key}"><i class="fas fa-trash-alt"></i></button>`;
@@ -108,8 +116,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const renderProjects = (projects) => {
         modalBody.innerHTML = '';
         if (projects.length === 0) {
-            modalBody.innerHTML = '<p>Tidak ada proyek/repositori yang ditemukan.</p>';
-            return;
+            modalBody.innerHTML = '<p>Tidak ada proyek/repositori yang ditemukan.</p>'; return;
         }
         projects.forEach(proj => {
             const item = document.createElement('div');
@@ -137,7 +144,7 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const keys = await callApi('getApiKeys');
             showAdminPanel(keys);
-            showNotification('Login berhasil!', 'success'); // Notifikasi login manual
+            showNotification('Login berhasil!', 'success');
         } catch (error) {
             showNotification(`Login Gagal: ${error.message}`, 'error');
             localStorage.removeItem('adminPassword'); 
@@ -151,7 +158,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (localStorage.getItem('adminPassword')) {
                 const keys = await callApi('getApiKeys');
                 showAdminPanel(keys);
-                showNotification('Login berhasil!', 'success'); // Notifikasi login refresh
+                showNotification('Login berhasil!', 'success');
             } else {
                 loginScreen.style.display = 'block';
             }
@@ -194,6 +201,19 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (error) {
             showNotification('Gagal memuat ulang daftar kunci.', 'error');
         }
+    });
+    
+    // BARU: Event listener untuk tombol copy
+    apiKeyCopyBtn.addEventListener('click', () => {
+        navigator.clipboard.writeText(apiKeyTextToCopy).then(() => {
+            apiKeyCopyBtn.innerHTML = '<i class="fas fa-check"></i> Tersalin!';
+            setTimeout(() => {
+                apiKeyCopyBtn.innerHTML = '<i class="fas fa-copy"></i> Copy';
+            }, 2000);
+        }).catch(err => {
+            console.error('Gagal menyalin teks: ', err);
+            showNotification('Gagal menyalin.', 'error');
+        });
     });
 
     manageProjectsBtn.addEventListener('click', async () => {

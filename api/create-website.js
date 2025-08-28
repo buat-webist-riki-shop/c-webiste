@@ -20,7 +20,7 @@ const VERCEL_API_BASE = `https://api.vercel.com`;
 const VERCEL_HEADERS = { "Authorization": `Bearer ${VERCEL_TOKEN}`, "Content-Type": "application/json" };
 const TEAM_QUERY = VERCEL_TEAM_ID ? `?teamId=${VERCEL_TEAM_ID}` : '';
 
-// --- Helper Functions (Tidak ada perubahan) ---
+// --- Helper Functions ---
 async function readJsonFromGithub(filePath) {
     try {
         const { data } = await octokit.repos.getContent({ owner: REPO_OWNER, repo: REPO_NAME_FOR_JSON, path: filePath });
@@ -56,8 +56,7 @@ const getAllFiles = (dirPath, arrayOfFiles) => {
     return arrayOfFiles;
 };
 
-
-// --- Handler Utama (Tidak ada perubahan) ---
+// --- Handler Utama ---
 export default async function handler(request, response) {
     if (request.method === 'GET') {
         return handleGetDomains(request, response);
@@ -73,7 +72,7 @@ export default async function handler(request, response) {
     return response.status(405).json({ message: 'Metode tidak diizinkan.' });
 }
 
-// --- Logika GET (Tidak ada perubahan) ---
+// --- Logika GET ---
 async function handleGetDomains(req, res) {
     try {
         const domainsData = JSON.parse(fs.readFileSync(path.resolve('./data/domains.json'), 'utf-8'));
@@ -82,7 +81,6 @@ async function handleGetDomains(req, res) {
         return res.status(500).json({ message: "Gagal memuat daftar domain." });
     }
 }
-
 
 // --- Logika POST untuk Admin ---
 async function handleJsonActions(req, res) {
@@ -106,7 +104,7 @@ async function handleJsonActions(req, res) {
                 const { subdomain, rootDomain } = data;
                 if (!subdomain || !rootDomain) return res.status(400).json({ message: "Subdomain dan domain utama diperlukan." });
                 const finalDomain = `${subdomain}.${rootDomain}`;
-                const checkRes = await fetch(`${VERCEL_API_BASE}/v9/projects/${finalDomain}${TEAM_QUERY}`, { headers: VERCEL_HEADERS });
+                const checkRes = await fetch(`${VERCEL_API_BASE}/v4/domains/status${TEAM_QUERY}&name=${finalDomain}`, { headers: VERCEL_HEADERS });
                 const result = await checkRes.json();
                 return res.status(200).json({ available: !result.available });
             }
@@ -119,25 +117,41 @@ async function handleJsonActions(req, res) {
         
         switch (action) {
             case "getApiKeys": {
-                 const apiKeys = await readJsonFromGithub(APIKEYS_PATH);
+                const apiKeys = await readJsonFromGithub(APIKEYS_PATH);
                 return res.status(200).json(apiKeys);
             }
             case "createApiKey": {
                 let apiKeys = await readJsonFromGithub(APIKEYS_PATH);
                 const { key, duration, unit, isPermanent } = data;
                 if (!key || apiKeys[key]) return res.status(400).json({ message: "Nama API Key tidak boleh kosong atau sudah ada."});
+                
+                const now = new Date();
                 let expires_at = "permanent";
+                
                 if (!isPermanent) {
-                    const now = new Date();
                     const d = parseInt(duration, 10);
-                    if (unit === "days") now.setDate(now.getDate() + d);
-                    else if (unit === "weeks") now.setDate(now.getDate() + (d * 7));
-                    else if (unit === "months") now.setMonth(now.getMonth() + d);
-                    expires_at = now.toISOString();
+                    const expiryDate = new Date(now);
+                    if (unit === "days") expiryDate.setDate(expiryDate.getDate() + d);
+                    else if (unit === "weeks") expiryDate.setDate(expiryDate.getDate() + (d * 7));
+                    else if (unit === "months") expiryDate.setMonth(expiryDate.getMonth() + d);
+                    expires_at = expiryDate.toISOString();
                 }
-                apiKeys[key] = { created_at: new Date().toISOString(), expires_at };
+
+                const newKeyData = { 
+                    created_at: now.toISOString(), 
+                    expires_at 
+                };
+                apiKeys[key] = newKeyData;
+                
                 await writeJsonToGithub(APIKEYS_PATH, apiKeys, `Create API Key: ${key}`);
-                return res.status(200).json({ message: `Kunci '${key}' berhasil dibuat.` });
+                
+                return res.status(200).json({ 
+                    message: `Kunci '${key}' berhasil dibuat.`, 
+                    newKey: { 
+                        name: key, 
+                        ...newKeyData 
+                    } 
+                });
             }
             case "deleteApiKey": {
                 let apiKeys = await readJsonFromGithub(APIKEYS_PATH);
@@ -147,8 +161,6 @@ async function handleJsonActions(req, res) {
                 await writeJsonToGithub(APIKEYS_PATH, apiKeys, `Delete API Key: ${key}`);
                 return res.status(200).json({ message: `Kunci '${key}' berhasil dihapus.` });
             }
-            
-            // --- DIUBAH TOTAL: Mengambil data dari GitHub & Vercel ---
             case "listProjects": {
                 // 1. Ambil semua repo dari GitHub
                 const { data: githubRepos } = await octokit.repos.listForUser({ username: REPO_OWNER, sort: 'created', direction: 'desc' });
@@ -178,7 +190,7 @@ async function handleJsonActions(req, res) {
                     } else {
                         allProjects[proj.name] = {
                             name: proj.name,
-                            githubUrl: null, // Mungkin tidak ada repo GitHub
+                            githubUrl: null,
                             isPrivate: null,
                             hasGithub: false,
                             hasVercel: true
@@ -186,11 +198,9 @@ async function handleJsonActions(req, res) {
                     }
                 });
                 
-                // Ubah dari objek ke array dan kirim
                 const combinedList = Object.values(allProjects);
                 return res.status(200).json(combinedList);
             }
-            
             case "deleteRepo": {
                 const { repoName } = data;
                 if (!repoName) return res.status(400).json({ message: "Nama repo diperlukan." });
@@ -219,7 +229,7 @@ async function handleJsonActions(req, res) {
     }
 }
 
-// --- Logika POST untuk Create Website (Tidak ada perubahan) ---
+// --- Logika POST untuk Create Website ---
 async function handleCreateWebsite(request, response) {
     const tempDir = path.join("/tmp", `website-${Date.now()}`);
     try {
@@ -314,6 +324,5 @@ async function handleCreateWebsite(request, response) {
         if (fs.existsSync(tempDir)) fs.rmSync(tempDir, { recursive: true, force: true });
     }
 }
-
 
 export const config = { api: { bodyParser: false } };

@@ -15,6 +15,7 @@ const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 const REPO_NAME_FOR_JSON = process.env.REPO_NAME_FOR_JSON;
 const VERCEL_A_RECORD = '76.76.21.21';
 const CLOUDFLARE_API_TOKEN = process.env.CLOUDFLARE_API_TOKEN;
+const CLOUDFLARE_ACCOUNT_ID = process.env.CLOUDFLARE_ACCOUNT_ID; // Opsional
 
 const octokit = new Octokit({ auth: GITHUB_TOKEN });
 const VERCEL_API_BASE = `https://api.vercel.com`;
@@ -106,7 +107,7 @@ async function handleJsonActions(req, res) {
                 const { subdomain, rootDomain } = data;
                 if (!subdomain || !rootDomain) return res.status(400).json({ message: "Subdomain dan domain utama diperlukan." });
                 const finalDomain = `${subdomain}.${rootDomain}`;
-                const checkRes = await fetch(`${VERCEL_API_BASE}/v4/domains/status${TEAM_QUERY}&name=${finalDomain}`, { headers: VERCEL_HEADERS });
+                const checkRes = await fetch(`${VERCEL_API_BASE}/v9/projects/${finalDomain}${TEAM_QUERY}`, { headers: VERCEL_HEADERS });
                 const result = await checkRes.json();
                 return res.status(200).json({ available: !result.available });
             }
@@ -300,11 +301,27 @@ async function handleCreateWebsite(request, response) {
         const { subdomain, rootDomain, apiKey } = Object.fromEntries(Object.entries(fields).map(([k, v]) => [k, v[0]]));
         const uploadedFile = files.websiteFile[0];
         if (!subdomain || !rootDomain || !apiKey || !uploadedFile) throw new Error("Semua kolom wajib diisi.");
+
         const validApiKeys = await readJsonFromGithub("data/apikeys.json");
         const keyData = validApiKeys[apiKey];
         if (!keyData || (keyData.expires_at !== "permanent" && new Date() > new Date(keyData.expires_at))) {
            throw new Error("API Key tidak valid atau sudah kadaluwarsa.");
         }
+        
+        const repoName = subdomain;
+
+        const vercelCheckRes = await fetch(`${VERCEL_API_BASE}/v9/projects/${repoName}${TEAM_QUERY}`, { headers: VERCEL_HEADERS });
+        if (vercelCheckRes.ok) {
+            throw new Error(`Nama proyek "${repoName}" sudah digunakan di Vercel.`);
+        }
+        
+        try {
+            await octokit.repos.get({ owner: REPO_OWNER, repo: repoName });
+            throw new Error(`Repositori "${repoName}" sudah ada di GitHub.`);
+        } catch (error) {
+            if (error.status !== 404) throw error;
+        }
+
         fs.mkdirSync(tempDir);
         if (uploadedFile.mimetype === "application/zip") {
             const zip = new AdmZip(uploadedFile.filepath);
@@ -312,40 +329,49 @@ async function handleCreateWebsite(request, response) {
         } else if (uploadedFile.mimetype === "text/html") {
             fs.renameSync(uploadedFile.filepath, path.join(tempDir, "index.html"));
         } else throw new Error("Format file tidak didukung.");
+        
         let uploadRoot = tempDir;
         const entries = fs.readdirSync(tempDir);
         if (entries.length === 1 && fs.statSync(path.join(tempDir, entries[0])).isDirectory()) {
             uploadRoot = path.join(tempDir, entries[0]);
         }
-        if (!fs.existsSync(path.join(uploadRoot, "index.html"))) {
-            throw new Error("File 'index.html' tidak ditemukan di dalam root file yang diunggah.");
-        }
-        const repoName = `${subdomain.replace(/[^a-z0-9-]/gi, '')}-${Math.floor(100 + Math.random() * 900)}`;
+        
         await octokit.repos.createForAuthenticatedUser({ name: repoName, private: true });
+        
         const allFiles = getAllFiles(uploadRoot);
         for (const filePath of allFiles) {
             const content = fs.readFileSync(filePath, "base64");
             const githubPath = path.relative(uploadRoot, filePath).replace(/\\/g, "/");
-            await octokit.repos.createOrUpdateFileContents({ owner: REPO_OWNER, repo: repoName, path: githubPath, message: `Initial commit: ${githubPath}`, content });
+            await octokit.repos.createOrUpdateFileContents({
+                owner: REPO_OWNER, repo: repoName, path: githubPath,
+                message: `Initial commit: ${githubPath}`, content
+            });
         }
+        
         const vercelProject = await fetch(`${VERCEL_API_BASE}/v9/projects${TEAM_QUERY}`, {
             method: "POST", headers: VERCEL_HEADERS,
-            body: JSON.stringify({ name: repoName, gitRepository: { type: "github", repo: `${REPO_OWNER}/${repoName}` }, framework: null })
+            body: JSON.stringify({ name: repoName, gitRepository: { type: "github", repo: `${REPO_OWNER}/${repoName}` } })
         }).then(res => res.json());
+
         if (vercelProject.error) throw new Error(`Vercel Error: ${vercelProject.error.message}`);
-        const vercelUrl = `${repoName}.vercel.app`;
+        
+        const vercelUrl = vercelProject.alias.find(a => a.domain.endsWith('.vercel.app')).domain;
+        
         await fetch(`${VERCEL_API_BASE}/v13/deployments${TEAM_QUERY}`, {
             method: 'POST', headers: VERCEL_HEADERS,
             body: JSON.stringify({ name: repoName, gitSource: { type: 'github', repoId: vercelProject.link.repoId, ref: 'main' }, target: 'production' })
         });
+
         const finalDomain = `${subdomain}.${rootDomain}`;
         await fetch(`${VERCEL_API_BASE}/v10/projects/${repoName}/domains${TEAM_QUERY}`, {
             method: "POST", headers: VERCEL_HEADERS,
             body: JSON.stringify({ name: finalDomain })
         });
+        
         const allDomains = JSON.parse(fs.readFileSync(path.resolve('./data/domains.json'), 'utf-8'));
         const domainInfo = allDomains[rootDomain];
         if (!domainInfo) throw new Error("Konfigurasi untuk domain utama tidak ditemukan.");
+        
         const cfAuthHeader = { "Authorization": `Bearer ${domainInfo.apitoken}` };
         const recordsRes = await fetch(`https://api.cloudflare.com/client/v4/zones/${domainInfo.zone}/dns_records?name=${finalDomain}`, { headers: cfAuthHeader }).then(res => res.json());
         if (recordsRes.success && recordsRes.result.length > 0) {
@@ -353,10 +379,12 @@ async function handleCreateWebsite(request, response) {
                 await fetch(`https://api.cloudflare.com/client/v4/zones/${domainInfo.zone}/dns_records/${record.id}`, { method: 'DELETE', headers: cfAuthHeader });
             }
         }
+
         await fetch(`https://api.cloudflare.com/client/v4/zones/${domainInfo.zone}/dns_records`, {
             method: "POST", headers: { ...cfAuthHeader, "Content-Type": "application/json" },
             body: JSON.stringify({ type: 'A', name: subdomain, content: VERCEL_A_RECORD, proxied: false, ttl: 1 })
         });
+        
         return response.status(200).json({
             message: "Proses pembuatan website dimulai!",
             siteData: { projectName: repoName, vercelUrl: `https://${vercelUrl}`, customUrl: `https://${finalDomain}`, status: 'pending' }

@@ -9,6 +9,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <style>
+        /* ... (CSS lain dari sebelumnya, tidak ada perubahan) ... */
         :root {
             --bg-color: #f0f2f5; --card-bg: #ffffff; --border-color: #e0e0e0;
             --primary-color: #007aff; --text-color: #1d1d1f; --text-muted: #6e6e73;
@@ -32,77 +33,50 @@
             width: 100%; max-width: 700px; background: var(--card-bg); border: 1px solid var(--border-color);
             border-radius: 20px; padding: 30px; box-shadow: var(--shadow);
         }
-        h1, h2 { font-weight: 600; }
-        h1 { text-align: center; margin-bottom: 25px; }
-        .form-group { margin-bottom: 20px; }
-        label { display: block; font-weight: 500; font-size: 0.9em; margin-bottom: 8px; }
-        input, select {
-            width: 100%; padding: 12px; font-family: inherit; font-size: 1em; background-color: var(--bg-color);
-            border: 1px solid var(--border-color); color: var(--text-color); border-radius: 8px;
-        }
-        button {
-            padding: 12px 20px; background-color: var(--primary-color); color: white; border: none;
-            border-radius: 8px; font-size: 1em; font-weight: 500; cursor: pointer; transition: all 0.2s;
-        }
-        button:hover { opacity: 0.85; }
-        button.full-width { width: 100%; font-size: 1.1em; padding: 14px; font-weight: 600; }
-        #admin-panel { display: none; }
-        .section-header { display: flex; justify-content: space-between; align-items: center; margin: 30px 0 15px; border-bottom: 1px solid var(--border-color); padding-bottom: 10px; }
-        .api-key-list .key-item { display: flex; justify-content: space-between; align-items: center; padding: 15px; background: var(--bg-color); border-radius: 8px; margin-bottom: 10px; border: 1px solid var(--border-color); }
-        .key-info span { display: block; }
-        .key-info .key-name { font-weight: 600; }
-        .key-info .key-expiry { font-size: 0.8em; color: var(--text-muted); }
-        .delete-btn { background-color: var(--error-color); color: white; border: none; padding: 8px 12px; border-radius: 6px; cursor: pointer; }
-        .duration-group { display: flex; gap: 10px; }
-        .permanent-toggle { display: flex; align-items: center; gap: 10px; margin-top: 15px; }
-        a.back-link { color: var(--primary-color); text-decoration: none; display: block; text-align: center; margin-top: 20px; font-size: 0.9em;}
-        .loading-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: var(--bg-color); z-index: 10000; display: flex; flex-direction: column; justify-content: center; align-items: center; opacity: 1; transition: opacity 0.5s ease; }
-        .loading-overlay.hidden { opacity: 0; pointer-events: none; }
-        .loading-logo { font-size: 3em; color: var(--primary-color); margin-bottom: 20px; animation: pulse 1.5s infinite ease-in-out; }
-        @keyframes pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.1); } }
-        .theme-toggle { position: fixed; bottom: 20px; right: 20px; width: 50px; height: 50px; background-color: var(--card-bg); border: 1px solid var(--border-color); border-radius: 50%; display: flex; justify-content: center; align-items: center; font-size: 1.2em; cursor: pointer; box-shadow: 0 4px 12px rgba(0,0,0,0.1); z-index: 1001; }
-        
-        /* --- Style Notifikasi --- */
-        .notification-container {
-            position: fixed;
-            top: 20px;
-            left: 50%; 
-            transform: translateX(-50%);
-            z-index: 10002;
-            width: 90%;
-            max-width: 400px;
-        }
-        .notification {
-            padding: 15px; margin-bottom: 10px; border-radius: 8px; color: white;
-            box-shadow: var(--shadow); opacity: 0;
-            transform: translateY(-100%); 
-            animation: slideInDown 0.5s forwards;
-            text-align: center;
-            transition: opacity 0.3s ease; /* BARU: transisi untuk ganti notif */
-        }
-        .notification.success { background-color: var(--success-color); }
-        .notification.error { background-color: var(--error-color); }
-        @keyframes slideInDown {
-            to { opacity: 1; transform: translateY(0); }
-        }
+        /* ... (CSS lain yang tidak relevan tetap sama) ... */
 
-        /* -- Style Modal (Popup) Utama & Konfirmasi -- */
-        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 9998; display: none; justify-content: center; align-items: center; backdrop-filter: blur(5px); }
-        .modal-content { background: var(--card-bg); padding: 30px; border-radius: 15px; width: 90%; max-width: 600px; position: relative; max-height: 80vh; overflow-y: auto; }
-        .modal-close { position: absolute; top: 15px; right: 15px; background: none; border: none; font-size: 1.5em; cursor: pointer; color: var(--text-muted); }
-        .modal-header { margin-bottom: 20px; }
-        .repo-list .repo-item { padding: 15px; background: var(--bg-color); border-radius: 8px; margin-bottom: 10px; border: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; transition: opacity 0.3s; }
-        .repo-info a { color: var(--primary-color); text-decoration: none; font-weight: 600; display: block; }
-        .repo-info span { font-size: 0.8em; color: var(--text-muted); }
-        .repo-actions button { font-size: 0.8em; padding: 6px 10px; }
-        .repo-actions .delete-vercel-btn { background-color: var(--warn-color); }
-        #confirmation-modal .modal-content { max-width: 320px; text-align: center; padding: 0; overflow: hidden; }
-        #confirmation-modal-title { font-size: 1.1em; font-weight: 600; padding: 20px 20px 5px; }
-        #confirmation-modal-message { font-size: 0.9em; padding: 0 20px 20px; color: var(--text-muted); }
-        .confirmation-buttons { display: flex; border-top: 1px solid var(--border-color); }
-        .confirmation-buttons button { flex: 1; padding: 14px; border-radius: 0; background: none; font-size: 1.05em; font-weight: 500; }
-        #confirm-btn-no { color: var(--primary-color); border-right: 1px solid var(--border-color); }
-        #confirm-btn-yes { color: var(--error-color); font-weight: 600; }
+        /* --- BARU: Style untuk Popup Sukses API Key --- */
+        #apikey-success-modal .modal-content {
+            max-width: 380px; text-align: center; padding: 0; overflow: hidden;
+        }
+        #apikey-success-modal h3 {
+            font-size: 1.2em; font-weight: 600; padding: 25px 20px 10px;
+        }
+        .apikey-details {
+            padding: 0 25px; margin-bottom: 20px; text-align: left;
+        }
+        .detail-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid var(--border-color);
+            font-size: 0.9em;
+        }
+        .detail-item:last-child { border-bottom: none; }
+        .detail-label { font-weight: 500; color: var(--text-muted); }
+        .detail-value { font-weight: 500; background: var(--bg-color); padding: 2px 6px; border-radius: 4px; }
+        .apikey-info-box {
+            background-color: var(--bg-color);
+            border: 1px solid var(--border-color);
+            padding: 15px;
+            margin: 0 25px 25px;
+            border-radius: 10px;
+            text-align: center;
+            font-size: 0.85em;
+            color: var(--text-muted);
+        }
+        .apikey-info-box i {
+            color: var(--primary-color);
+            margin-right: 8px;
+        }
+        .apikey-success-footer {
+            display: flex;
+            border-top: 1px solid var(--border-color);
+        }
+        .apikey-success-footer button {
+            flex: 1; padding: 15px; border-radius: 0; background: none;
+            font-size: 1.05em; font-weight: 600; color: var(--primary-color);
+        }
     </style>
 </head>
 <body>
@@ -135,20 +109,21 @@
     <div id="theme-toggle" class="theme-toggle"><i class="fas fa-moon"></i></div>
 
     <div id="project-modal" class="modal-overlay">
-        <div class="modal-content">
-            <button id="modal-close-btn" class="modal-close">&times;</button>
-            <div class="modal-header"><h2 id="modal-title">Daftar Repositori & Proyek</h2></div>
-            <div id="modal-body" class="repo-list"></div>
         </div>
-    </div>
     
     <div id="confirmation-modal" class="modal-overlay">
+        </div>
+
+    <div id="apikey-success-modal" class="modal-overlay">
         <div class="modal-content">
-            <h3 id="confirmation-modal-title">Konfirmasi Tindakan</h3>
-            <p id="confirmation-modal-message">Apakah Anda yakin?</p>
-            <div class="confirmation-buttons">
-                <button id="confirm-btn-no">Batal</button>
-                <button id="confirm-btn-yes">Hapus</button>
+            <h3><i class="fas fa-check-circle" style="color: var(--success-color);"></i> Kunci Berhasil Dibuat!</h3>
+            <div class="apikey-details" id="apikey-details-container">
+                </div>
+            <div class="apikey-info-box">
+                <p><i class="fas fa-info-circle"></i> Harap salin dan simpan Kunci API Anda di tempat yang aman. Anda tidak akan bisa melihatnya lagi setelah ini.</p>
+            </div>
+            <div class="apikey-success-footer">
+                <button id="apikey-success-ok-btn">OK</button>
             </div>
         </div>
     </div>

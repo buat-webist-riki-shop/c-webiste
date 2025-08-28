@@ -355,7 +355,8 @@ async function handleCreateWebsite(request, response) {
 
         if (vercelProject.error) throw new Error(`Vercel Error: ${vercelProject.error.message}`);
         
-        const vercelUrl = vercelProject.alias.find(a => a.domain.endsWith('.vercel.app')).domain;
+        // --- PERBAIKAN BUG DI SINI ---
+        const vercelUrl = `${repoName}.vercel.app`; // Membuat URL secara manual, lebih andal
         
         await fetch(`${VERCEL_API_BASE}/v13/deployments${TEAM_QUERY}`, {
             method: 'POST', headers: VERCEL_HEADERS,

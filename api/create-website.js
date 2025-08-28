@@ -142,6 +142,31 @@ async function handleJsonActions(req, res) {
                 await writeJsonToGithub(APIKEYS_PATH, apiKeys, `Delete API Key: ${key}`);
                 return res.status(200).json({ message: `Kunci '${key}' berhasil dihapus.` });
             }
+            // --- FUNGSI BARU DITAMBAHKAN DI SINI ---
+            case "listRepos": {
+                const { data: repos } = await octokit.repos.listForAuthenticatedUser({ visibility: 'all', sort: 'created', direction: 'desc' });
+                const filteredRepos = repos.map(repo => ({ name: repo.name, url: repo.html_url, private: repo.private }));
+                return res.status(200).json(filteredRepos);
+            }
+            case "deleteRepo": {
+                const { repoName } = data;
+                if (!repoName) return res.status(400).json({ message: "Nama repo diperlukan." });
+                await octokit.repos.delete({ owner: REPO_OWNER, repo: repoName });
+                return res.status(200).json({ message: `Repositori '${repoName}' berhasil dihapus.` });
+            }
+            case "deleteVercelProject": {
+                const { projectName } = data;
+                if (!projectName) return res.status(400).json({ message: "Nama proyek diperlukan." });
+                const deleteRes = await fetch(`${VERCEL_API_BASE}/v9/projects/${projectName}${TEAM_QUERY}`, {
+                    method: 'DELETE',
+                    headers: VERCEL_HEADERS
+                });
+                if (!deleteRes.ok) {
+                    const error = await deleteRes.json();
+                    throw new Error(`Gagal menghapus proyek Vercel: ${error.error.message}`);
+                }
+                return res.status(200).json({ message: `Proyek Vercel '${projectName}' berhasil dihapus.` });
+            }
             default:
                 return res.status(400).json({ message: "Aksi tidak dikenal." });
         }
@@ -152,6 +177,7 @@ async function handleJsonActions(req, res) {
 }
 
 // --- Logika POST untuk Create Website ---
+// Tidak ada perubahan di fungsi ini
 async function handleCreateWebsite(request, response) {
     const tempDir = path.join("/tmp", `website-${Date.now()}`);
     try {
@@ -205,8 +231,6 @@ async function handleCreateWebsite(request, response) {
 
         if (vercelProject.error) throw new Error(`Vercel Error: ${vercelProject.error.message}`);
         
-        // --- PERBAIKAN DI SINI ---
-        // Kita buat URL-nya sendiri karena lebih aman daripada membaca dari 'alias'
         const vercelUrl = `${repoName}.vercel.app`;
         
         await fetch(`${VERCEL_API_BASE}/v13/deployments${TEAM_QUERY}`, {

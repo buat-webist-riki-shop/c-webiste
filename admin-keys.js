@@ -1,5 +1,5 @@
 document.addEventListener('DOMContentLoaded', () => {
-    // Elemen UI
+    // === Elemen UI ===
     const loadingOverlay = document.getElementById('loading-overlay');
     const loginScreen = document.getElementById('login-screen');
     const adminPanel = document.getElementById('admin-panel');
@@ -9,12 +9,38 @@ document.addEventListener('DOMContentLoaded', () => {
     const keyListContainer = document.getElementById('api-key-list-container');
     const permanentCheckbox = document.getElementById('permanent-key');
     const durationSection = document.getElementById('duration-section');
-    
-    // Elemen Tema
     const themeToggle = document.getElementById('theme-toggle');
     const body = document.body;
+    const notificationContainer = document.getElementById('notification-container');
     
-    // --- LOGIKA TEMA TERANG/GELAP ---
+    // Elemen baru untuk manajemen proyek
+    const manageProjectsBtn = document.getElementById('manage-projects-btn');
+    const projectModal = document.getElementById('project-modal');
+    const modalCloseBtn = document.getElementById('modal-close-btn');
+    const modalTitle = document.getElementById('modal-title');
+    const modalBody = document.getElementById('modal-body');
+
+    // === Logika Notifikasi Estetis ===
+    const showNotification = (message, type = 'success') => {
+        const notif = document.createElement('div');
+        notif.className = `notification ${type}`;
+        notif.textContent = message;
+        notificationContainer.appendChild(notif);
+        setTimeout(() => {
+            notif.remove();
+        }, 4000);
+    };
+
+    // === Logika Modal (Popup) ===
+    const openModal = () => projectModal.style.display = 'flex';
+    const closeModal = () => projectModal.style.display = 'none';
+
+    modalCloseBtn.addEventListener('click', closeModal);
+    projectModal.addEventListener('click', (e) => {
+        if (e.target === projectModal) closeModal();
+    });
+
+    // === Logika Tema Terang/Gelap ===
     const applyTheme = (theme) => {
         if (theme === 'dark') {
             body.classList.add('dark-mode');
@@ -31,11 +57,11 @@ document.addEventListener('DOMContentLoaded', () => {
         applyTheme(newTheme);
     });
 
-    // --- LOGIKA UTAMA ---
+    // === Logika API ===
     const callApi = async (action, data = {}) => {
         const password = sessionStorage.getItem('adminPassword');
         if (!password) {
-            alert('Sesi admin tidak ditemukan. Harap login ulang.');
+            showNotification('Sesi admin tidak ditemukan. Harap login ulang.', 'error');
             throw new Error('Sesi admin tidak valid');
         }
         
@@ -50,6 +76,7 @@ document.addEventListener('DOMContentLoaded', () => {
         return result;
     };
 
+    // === Fungsi Render & Event Listener ===
     const loadApiKeys = async () => {
         keyListContainer.innerHTML = '<p>Memuat kunci...</p>';
         try {
@@ -76,24 +103,94 @@ document.addEventListener('DOMContentLoaded', () => {
                 keyListContainer.appendChild(item);
             }
         } catch (error) {
-            keyListContainer.innerHTML = `<p style="color: red;">${error.message}</p>`;
+            keyListContainer.innerHTML = `<p style="color: var(--error-color);">${error.message}</p>`;
         }
     };
 
+    const renderProjects = (repos) => {
+        modalBody.innerHTML = '';
+        if (repos.length === 0) {
+            modalBody.innerHTML = '<p>Tidak ada repositori yang ditemukan.</p>';
+            return;
+        }
+        repos.forEach(repo => {
+            const item = document.createElement('div');
+            item.className = 'repo-item';
+            item.innerHTML = `
+                <div class="repo-info">
+                    <a href="${repo.url}" target="_blank">${repo.name}</a>
+                    <span>${repo.private ? 'Private' : 'Public'}</span>
+                </div>
+                <div class="repo-actions">
+                    <button class="delete-btn delete-repo-btn" data-name="${repo.name}">Hapus Repo</button>
+                    <button class="delete-btn delete-vercel-btn" data-name="${repo.name}">Hapus Vercel</button>
+                </div>
+            `;
+            modalBody.appendChild(item);
+        });
+    };
+
+    manageProjectsBtn.addEventListener('click', async () => {
+        modalTitle.textContent = 'Daftar Repositori & Proyek';
+        modalBody.innerHTML = '<p>Memuat proyek...</p>';
+        openModal();
+        try {
+            const repos = await callApi('listRepos');
+            renderProjects(repos);
+        } catch (error) {
+            showNotification(error.message, 'error');
+            modalBody.innerHTML = `<p style="color: var(--error-color);">${error.message}</p>`;
+        }
+    });
+
+    modalBody.addEventListener('click', async (e) => {
+        const target = e.target.closest('button');
+        if (!target) return;
+
+        const repoName = target.dataset.name;
+        let action = '';
+        let confirmationMessage = '';
+        
+        if (target.classList.contains('delete-repo-btn')) {
+            action = 'deleteRepo';
+            confirmationMessage = `Anda YAKIN ingin menghapus repositori GitHub '${repoName}'? Tindakan ini tidak dapat diurungkan.`;
+        } else if (target.classList.contains('delete-vercel-btn')) {
+            action = 'deleteVercelProject';
+            confirmationMessage = `Anda YAKIN ingin menghapus proyek Vercel '${repoName}'?`;
+        } else {
+            return;
+        }
+
+        if (confirm(confirmationMessage)) {
+            target.textContent = 'Menghapus...';
+            target.disabled = true;
+            try {
+                const result = await callApi(action, { repoName: repoName, projectName: repoName });
+                showNotification(result.message, 'success');
+                // Refresh list
+                manageProjectsBtn.click();
+            } catch (error) {
+                showNotification(error.message, 'error');
+                target.textContent = action === 'deleteRepo' ? 'Hapus Repo' : 'Hapus Vercel';
+                target.disabled = false;
+            }
+        }
+    });
+
     loginBtn.addEventListener('click', async () => {
         const password = passwordInput.value;
-        if (!password) return alert('Password tidak boleh kosong.');
+        if (!password) return showNotification('Password tidak boleh kosong.', 'error');
         sessionStorage.setItem('adminPassword', password);
         
         try {
             loginBtn.textContent = 'Memverifikasi...';
             loginBtn.disabled = true;
-            await callApi('getApiKeys');
+            await callApi('getApiKeys'); // Test call
             loginScreen.style.display = 'none';
             adminPanel.style.display = 'block';
             loadApiKeys();
         } catch (error) {
-            alert(`Login Gagal: ${error.message}`);
+            showNotification(`Login Gagal: ${error.message}`, 'error');
             sessionStorage.removeItem('adminPassword');
         } finally {
             loginBtn.textContent = 'Masuk';
@@ -112,11 +209,11 @@ document.addEventListener('DOMContentLoaded', () => {
         };
         try {
             const result = await callApi('createApiKey', data);
-            alert(`Sukses: ${result.message}`);
+            showNotification(result.message, 'success');
             keyNameInput.value = '';
             loadApiKeys();
         } catch (error) {
-            alert(`Gagal: ${error.message}`);
+            showNotification(`Gagal: ${error.message}`, 'error');
         }
     });
     
@@ -127,10 +224,10 @@ document.addEventListener('DOMContentLoaded', () => {
             if (confirm(`Yakin ingin menghapus kunci "${key}"?`)) {
                 try {
                     const result = await callApi('deleteApiKey', { key });
-                    alert(`Sukses: ${result.message}`);
+                    showNotification(result.message, 'success');
                     loadApiKeys();
                 } catch (error) {
-                    alert(`Gagal: ${error.message}`);
+                    showNotification(`Gagal: ${error.message}`, 'error');
                 }
             }
         }
@@ -140,15 +237,14 @@ document.addEventListener('DOMContentLoaded', () => {
         durationSection.style.display = permanentCheckbox.checked ? 'none' : 'block';
     });
 
-    // --- INISIALISASI ---
+    // === Inisialisasi ===
     const init = () => {
         const savedTheme = localStorage.getItem('theme_preference_v1') || 'light';
         applyTheme(savedTheme);
 
-        // Tampilkan login screen setelah 500ms agar animasi loading terlihat
         setTimeout(() => {
             if (sessionStorage.getItem('adminPassword')) {
-                loginBtn.click(); // Coba login otomatis jika ada sesi
+                loginBtn.click();
             } else {
                 loginScreen.style.display = 'block';
             }

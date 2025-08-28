@@ -57,6 +57,7 @@
         #created-sites-container { display: none; }
         .sites-list-item { background: var(--bg-color); border-radius: 12px; padding: 15px; margin-bottom: 10px; cursor: pointer; transition: background-color 0.2s, transform 0.2s; display: flex; justify-content: space-between; align-items: center; border: 1px solid var(--border-color); position: relative; }
         .sites-list-item:hover { transform: scale(1.02); }
+        .site-info { padding-right: 30px; }
         .site-info h3 { margin: 0 0 5px; font-size: 1.1em; color: var(--text-color);}
         .delete-site-btn { position: absolute; top: 5px; right: 5px; background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 1.1em; width: 25px; height: 25px; display: flex; align-items: center; justify-content: center; }
         .delete-site-btn:hover { color: var(--error-color); }
@@ -92,7 +93,7 @@
     <div class="main-container">
         <div class="creator-card">
             <h1>Buat Website Otomatis</h1>
-            <p>Unggah file website dan publikasikan ke domain pilihan Anda.</p>
+            <p>Unggah file website (.zip/.html) atau proyek Node.js (.zip).</p>
             <form id="creator-form" style="margin-top: 25px;">
                 <div class="form-group">
                     <div class="label-group">
@@ -106,7 +107,7 @@
                     <select id="root-domain-select" required><option value="">Memuat domain...</option></select>
                 </div>
                 <div class="form-group">
-                    <label for="website-file">File Website (.zip atau .html)</label>
+                    <label for="website-file">File Proyek (.zip atau .html)</label>
                     <label for="website-file" id="file-upload-label"><i class="fas fa-cloud-upload-alt"></i><span id="file-name-span">Pilih file...</span></label>
                     <input type="file" id="website-file" accept=".zip,.html" required>
                 </div>
@@ -118,7 +119,7 @@
             </form>
         </div>
         <div id="created-sites-container" class="creator-card">
-            <h1><i class="fas fa-list"></i> Website Anda</h1>
+            <h1><i class="fas fa-list"></i> Riwayat Website Anda</h1>
             <div id="sites-list" style="margin-top: 20px;"></div>
         </div>
     </div>

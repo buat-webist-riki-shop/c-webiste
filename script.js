@@ -299,8 +299,14 @@ document.addEventListener('DOMContentLoaded', () => {
         const savedTheme = localStorage.getItem('theme_preference_v1') || 'light';
         applyTheme(savedTheme);
         renderSitesList();
-        await fetchDomains();
-        loadingOverlay.classList.add('hidden');
+        try {
+            await fetchDomains();
+        } catch (error) {
+            console.error("Gagal memuat domain:", error);
+            showToast('Gagal memuat daftar domain.', 'error');
+        } finally {
+            loadingOverlay.classList.add('hidden');
+        }
     };
     
     initializePage();

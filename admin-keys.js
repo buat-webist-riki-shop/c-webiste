@@ -156,28 +156,23 @@ ${notes}`;
         const selectAllCheckbox = container.querySelector('.select-all-checkbox');
         const checkboxes = container.querySelectorAll('.item-checkbox');
         const bulkDeleteBtn = container.querySelector('.bulk-delete-btn');
-
         const updateButtonVisibility = () => {
             const checkedCount = container.querySelectorAll('.item-checkbox:checked').length;
             bulkDeleteBtn.style.display = checkedCount > 0 ? 'inline-flex' : 'none';
             bulkDeleteBtn.textContent = `Hapus ${checkedCount} Item Terpilih`;
         };
-
         if(selectAllCheckbox) selectAllCheckbox.addEventListener('change', (e) => {
             checkboxes.forEach(cb => cb.checked = e.target.checked);
             updateButtonVisibility();
         });
-
         checkboxes.forEach(cb => cb.addEventListener('change', () => {
             if(selectAllCheckbox) selectAllCheckbox.checked = [...checkboxes].every(c => c.checked);
             updateButtonVisibility();
         }));
-        
         if(bulkDeleteBtn) bulkDeleteBtn.addEventListener('click', async () => {
             const selectedItems = [...checkboxes].filter(cb => cb.checked);
             const selectedIds = selectedItems.map(cb => cb.value);
             const selectedNames = selectedItems.map(cb => cb.dataset.name);
-
             let confirmed = false;
             if (listType === 'zones') {
                 const confirmationMessage = `Anda akan MENGHAPUS PERMANEN ${selectedIds.length} zona berikut:\n\n${selectedNames.join('\n')}\n\nLanjutkan?`;
@@ -185,7 +180,6 @@ ${notes}`;
             } else {
                 confirmed = await showConfirmation('Hapus Record DNS?', `Anda yakin ingin menghapus ${selectedIds.length} record DNS terpilih?`);
             }
-
             if (confirmed) {
                 bulkDeleteBtn.textContent = 'Menghapus...'; bulkDeleteBtn.disabled = true;
                 try {
@@ -220,7 +214,6 @@ ${notes}`;
                 <button class="manage-dns-btn" data-zone-id="${zone.id}" data-zone-name="${zone.name}">Kelola DNS</button>
             </li>
         `).join('');
-
         cloudflareModalBody.innerHTML = `
             <div class="list-toolbar">
                 <form id="add-domain-form" class="add-domain-form">
@@ -248,7 +241,6 @@ ${notes}`;
                 </div>
             </li>
         `).join('');
-        
         cloudflareModalBody.innerHTML = `
             <div class="list-toolbar">
                  <button id="cloudflare-modal-back-btn">&larr; Kembali</button>
@@ -359,18 +351,18 @@ ${notes}`;
     });
 
     manageProjectsBtn.addEventListener('click', async () => {
-        modalBody.innerHTML = '<p>Memuat proyek...</p>';
+        projectModal.querySelector('#modal-body').innerHTML = '<p>Memuat proyek...</p>';
         openModal(projectModal);
         try {
             const projects = await callApi('listProjects');
             renderProjects(projects);
         } catch (error) {
             showNotification(error.message, 'error');
-            modalBody.innerHTML = `<p style="color: var(--error-color);">${error.message}</p>`;
+            projectModal.querySelector('#modal-body').innerHTML = `<p style="color: var(--error-color);">${error.message}</p>`;
         }
     });
 
-    modalBody.addEventListener('click', async (e) => {
+    projectModal.querySelector('#modal-body').addEventListener('click', async (e) => {
         const targetButton = e.target.closest('button.delete-btn');
         if (!targetButton) return;
         const repoName = targetButton.dataset.name;
@@ -442,7 +434,7 @@ ${notes}`;
             button.textContent = 'Menambahkan...'; button.disabled = true;
             try {
                 const result = await callApi('addCloudflareZone', { domainName });
-                closeModal(cloudflareModal); // Tutup modal utama dulu
+                closeModal(cloudflareModal);
                 showCloudflareSuccessPopup(result);
                 input.value = '';
             } catch (error) {

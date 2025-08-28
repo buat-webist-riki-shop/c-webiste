@@ -25,19 +25,6 @@
             display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 20px;
             transition: background-color 0.3s, color 0.3s;
         }
-        
-        /* --- Loading Screen Estetik --- */
-        .loading-overlay {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background-color: var(--bg-color); z-index: 10000;
-            display: flex; flex-direction: column; justify-content: center; align-items: center;
-            opacity: 1; transition: opacity 0.5s ease, visibility 0s 0.5s; visibility: visible;
-        }
-        .loading-overlay.hidden { opacity: 0; visibility: hidden; }
-        .loading-logo { font-size: 3em; color: var(--primary-color); margin-bottom: 20px; animation: pulse 1.8s infinite ease-in-out; }
-        @keyframes pulse { 0%, 100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.1); opacity: 0.8; } }
-        .loading-overlay p { color: var(--text-muted); font-size: 1em; font-weight: 500; }
-
         .main-container { width: 100%; max-width: 550px; }
         .creator-card {
             background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 20px;
@@ -68,9 +55,11 @@
         .spinner { width: 18px; height: 18px; border: 2px solid rgba(255,255,255,0.3); border-top-color: #fff; border-radius: 50%; animation: spin 1s linear infinite; }
         @keyframes spin { to { transform: rotate(360deg); } }
         #created-sites-container { display: none; }
-        .sites-list-item { background: var(--bg-color); border-radius: 12px; padding: 15px; margin-bottom: 10px; cursor: pointer; transition: background-color 0.2s, transform 0.2s; display: flex; justify-content: space-between; align-items: center; border: 1px solid var(--border-color); }
+        .sites-list-item { background: var(--bg-color); border-radius: 12px; padding: 15px; margin-bottom: 10px; cursor: pointer; transition: background-color 0.2s, transform 0.2s; display: flex; justify-content: space-between; align-items: center; border: 1px solid var(--border-color); position: relative; }
         .sites-list-item:hover { transform: scale(1.02); }
         .site-info h3 { margin: 0 0 5px; font-size: 1.1em; color: var(--text-color);}
+        .delete-site-btn { position: absolute; top: 5px; right: 5px; background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 1.1em; width: 25px; height: 25px; display: flex; align-items: center; justify-content: center; }
+        .delete-site-btn:hover { color: var(--error-color); }
         .status { padding: 4px 10px; border-radius: 20px; font-size: 0.8em; font-weight: 500; color: white;}
         .status.pending { background-color: var(--pending-color); }
         .status.success { background-color: var(--success-color); }
@@ -84,37 +73,20 @@
         .domain-item { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
         .domain-item a { color: var(--primary-color); text-decoration: none; word-break: break-all; }
         .check-status-btn { background: none; border: 1px solid var(--primary-color); color: var(--primary-color); padding: 5px 12px; font-size: 0.8em; font-weight: 500; border-radius: 20px; width: auto; }
-        #toast-notification {
-            position: fixed; top: 20px; left: 50%;
-            transform: translate(-50%, -150%);
-            z-index: 9999; background-color: rgba(44, 44, 46, 0.85);
-            color: #fff; padding: 12px 20px; border-radius: 25px;
-            font-size: 0.9em; font-weight: 500;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
-            backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
-            opacity: 0;
-            transition: transform 0.5s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.5s ease;
-            display: flex; align-items: center; gap: 10px;
-            pointer-events: none;
-        }
+        #toast-notification { position: fixed; top: 20px; left: 50%; transform: translate(-50%, -150%); z-index: 9999; background-color: rgba(44, 44, 46, 0.85); color: #fff; padding: 12px 20px; border-radius: 25px; font-size: 0.9em; font-weight: 500; box-shadow: 0 4px 15px rgba(0,0,0,0.2); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); opacity: 0; transition: transform 0.5s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.5s ease; display: flex; align-items: center; gap: 10px; pointer-events: none; }
         #toast-notification.show { opacity: 1; transform: translate(-50%, 0); }
         #toast-notification.success { background-color: rgba(50, 215, 75, 0.85); }
         #toast-notification.error { background-color: rgba(255, 69, 58, 0.85); }
-        .theme-toggle {
-            position: fixed; bottom: 20px; right: 20px; width: 50px; height: 50px;
-            background-color: var(--card-bg); border: 1px solid var(--border-color);
-            border-radius: 50%; display: flex; justify-content: center; align-items: center;
-            font-size: 1.2em; cursor: pointer; box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-            z-index: 1001;
-        }
+        .theme-toggle { position: fixed; bottom: 20px; right: 20px; width: 50px; height: 50px; background-color: var(--card-bg); border: 1px solid var(--border-color); border-radius: 50%; display: flex; justify-content: center; align-items: center; font-size: 1.2em; cursor: pointer; box-shadow: 0 4px 12px rgba(0,0,0,0.1); z-index: 1001; }
+        .loading-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: var(--bg-color); z-index: 10000; display: flex; justify-content: center; align-items: center; opacity: 1; transition: opacity 0.5s ease; }
+        .loading-overlay.hidden { opacity: 0; pointer-events: none; }
+        .loading-logo { font-size: 2.5em; color: var(--primary-color); animation: pulse 1.5s infinite; }
+        @keyframes pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.1); } }
     </style>
 </head>
 <body>
-    <div id="loading-overlay" class="loading-overlay">
-        <i class="fas fa-rocket loading-logo"></i>
-        <p>Mempersiapkan halaman...</p>
-    </div>
 
+    <div id="loading-overlay" class="loading-overlay"><i class="fas fa-bolt loading-logo"></i></div>
     <div id="toast-notification"></div>
 
     <div class="main-container">
@@ -127,7 +99,7 @@
                         <label for="subdomain-name">Nama Website (Subdomain)</label>
                         <span id="subdomain-status"></span>
                     </div>
-                    <input type="text" id="subdomain-name" placeholder="contoh: toko-saya (hanya huruf kecil, angka, dan -)" required>
+                    <input type="text" id="subdomain-name" placeholder="contoh: toko-saya (tanpa angka acak)" required>
                 </div>
                 <div class="form-group">
                     <label for="root-domain-select">Pilih Domain Utama</label>
@@ -179,6 +151,17 @@
             </div>
             <div class="modal-footer" style="margin-top: 20px; text-align: center;">
                 <button id="modal-close-btn" style="background-color: var(--primary-color);">Tutup</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="confirmation-modal" class="modal-overlay">
+        <div class="modal-content" style="max-width: 320px; padding: 0; text-align: center;">
+            <h3 id="confirmation-modal-title" style="font-size: 1.1em; padding: 20px 20px 5px;">Hapus Riwayat?</h3>
+            <p id="confirmation-modal-message" style="font-size: 0.9em; padding: 0 20px 20px;">Tindakan ini hanya akan menghapus riwayat dari browser Anda.</p>
+            <div style="display: flex; border-top: 1px solid var(--border-color);">
+                <button id="confirm-btn-no" style="flex: 1; border-radius: 0; background: none; font-size: 1.05em; color: var(--primary-color); border-right: 1px solid var(--border-color);">Batal</button>
+                <button id="confirm-btn-yes" style="flex: 1; border-radius: 0; background: none; font-size: 1.05em; color: var(--error-color); font-weight: 600;">Hapus</button>
             </div>
         </div>
     </div>

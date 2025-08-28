@@ -62,12 +62,12 @@
         @keyframes pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.1); } }
         .theme-toggle { position: fixed; bottom: 20px; right: 20px; width: 50px; height: 50px; background-color: var(--card-bg); border: 1px solid var(--border-color); border-radius: 50%; display: flex; justify-content: center; align-items: center; font-size: 1.2em; cursor: pointer; box-shadow: 0 4px 12px rgba(0,0,0,0.1); z-index: 1001; }
         
-        /* --- DIUBAH: Style Notifikasi --- */
+        /* --- Style Notifikasi --- */
         .notification-container {
             position: fixed;
             top: 20px;
-            left: 50%; /* Pindahkan ke tengah horizontal */
-            transform: translateX(-50%); /* Pastikan benar-benar di tengah */
+            left: 50%; 
+            transform: translateX(-50%);
             z-index: 10002;
             width: 90%;
             max-width: 400px;
@@ -75,13 +75,14 @@
         .notification {
             padding: 15px; margin-bottom: 10px; border-radius: 8px; color: white;
             box-shadow: var(--shadow); opacity: 0;
-            transform: translateY(-100%); /* Mulai dari atas */
+            transform: translateY(-100%); 
             animation: slideInDown 0.5s forwards;
             text-align: center;
+            transition: opacity 0.3s ease; /* BARU: transisi untuk ganti notif */
         }
         .notification.success { background-color: var(--success-color); }
         .notification.error { background-color: var(--error-color); }
-        @keyframes slideInDown { /* Ubah nama animasi */
+        @keyframes slideInDown {
             to { opacity: 1; transform: translateY(0); }
         }
 

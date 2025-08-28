@@ -71,20 +71,20 @@
         .modal-content { background: var(--card-bg); padding: 30px; border-radius: 15px; width: 90%; max-width: 700px; position: relative; max-height: 80vh; display: flex; flex-direction: column; }
         .modal-close { position: absolute; top: 15px; right: 15px; background: none; border: none; font-size: 1.5em; cursor: pointer; color: var(--text-muted); }
         .modal-header { margin-bottom: 20px; flex-shrink: 0; }
-        .repo-list { overflow-y: auto; }
+        .repo-list, #modal-body { flex-grow: 1; overflow-y: auto; min-height: 0; } /* Perbaikan Scroll untuk Proyek */
         .repo-item { padding: 15px; background: var(--bg-color); border-radius: 8px; margin-bottom: 10px; border: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; transition: opacity 0.3s; }
         .repo-info a { color: var(--primary-color); text-decoration: none; font-weight: 600; display: block; }
         .repo-info span { font-size: 0.8em; color: var(--text-muted); }
         .repo-actions button { font-size: 0.8em; padding: 6px 10px; }
         .repo-actions .delete-vercel-btn { background-color: var(--warn-color); }
-        #confirmation-modal .modal-content { max-width: 320px; text-align: center; padding: 0; overflow: hidden; display: block; }
+        #confirmation-modal .modal-content, #apikey-success-modal .modal-content, #cf-success-modal .modal-content { display: block; max-height: none; }
         #confirmation-modal-title { font-size: 1.1em; font-weight: 600; padding: 20px 20px 5px; }
         #confirmation-modal-message { font-size: 0.9em; padding: 0 20px 20px; color: var(--text-muted); white-space: pre-wrap; }
         .confirmation-buttons { display: flex; border-top: 1px solid var(--border-color); }
         .confirmation-buttons button { flex: 1; padding: 14px; border-radius: 0; background: none; font-size: 1.05em; font-weight: 500; }
         #confirm-btn-no { color: var(--primary-color); border-right: 1px solid var(--border-color); }
         #confirm-btn-yes { color: var(--error-color); font-weight: 600; }
-        #apikey-success-modal .modal-content { max-width: 380px; text-align: center; padding: 0; overflow: hidden; display: block; }
+        #apikey-success-modal .modal-content { max-width: 380px; text-align: center; padding: 0; overflow: hidden; }
         #apikey-success-modal h3 { font-size: 1.2em; font-weight: 600; padding: 25px 20px 10px; }
         .apikey-details { padding: 0 25px; margin-bottom: 20px; text-align: left; }
         .detail-item { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--border-color); font-size: 0.9em; }
@@ -108,7 +108,7 @@
         .add-domain-form input { flex-grow: 1; }
         #cloudflare-modal-back-btn { background-color: var(--text-muted); }
         .bulk-delete-btn { background-color: var(--error-color); display: none; margin-left: auto; }
-        #cf-success-modal .modal-content { max-width: 420px; text-align: center; padding: 0; overflow: hidden; display: block; }
+        #cf-success-modal .modal-content { max-width: 420px; text-align: center; padding: 0; overflow: hidden; }
         .nameserver-list { list-style-type: none; padding: 0; margin: 0 25px 20px; }
         .nameserver-item { display: flex; justify-content: space-between; align-items: center; padding: 10px; background-color: var(--bg-color); border-radius: 8px; margin-bottom: 8px; font-family: monospace; }
         .copy-ns-btn { font-size: 0.8em; padding: 4px 8px; background-color: var(--text-muted); }

@@ -135,8 +135,7 @@ ${notes}`;
             const githubButton = proj.hasGithub ? `<button class="delete-btn delete-repo-btn" data-name="${proj.name}">Hapus Repo</button>` : '';
             const vercelButton = proj.hasVercel ? `<button class="delete-btn delete-vercel-btn" data-name="${proj.name}">Hapus Vercel</button>` : '';
             const repoInfo = proj.hasGithub ? `<a href="${proj.githubUrl}" target="_blank">${proj.name}</a><span>${proj.isPrivate ? 'Private' : 'Public'}</span>` : `<strong>${proj.name}</strong><span>(Hanya ada di Vercel)</span>`;
-            item.innerHTML = `<div class="repo-info">${repoInfo}</div><div class="repo-actions">${githubButton}${vercelButton}</div>`;
-            modalBody.appendChild(item);
+            modalBody.innerHTML += `<div class="repo-item">${repoInfo}<div class="repo-actions">${githubButton}${vercelButton}</div></div>`;
         });
     };
     
@@ -351,18 +350,18 @@ ${notes}`;
     });
 
     manageProjectsBtn.addEventListener('click', async () => {
-        projectModal.querySelector('#modal-body').innerHTML = '<p>Memuat proyek...</p>';
+        modalBody.innerHTML = '<p>Memuat proyek...</p>';
         openModal(projectModal);
         try {
             const projects = await callApi('listProjects');
             renderProjects(projects);
         } catch (error) {
             showNotification(error.message, 'error');
-            projectModal.querySelector('#modal-body').innerHTML = `<p style="color: var(--error-color);">${error.message}</p>`;
+            modalBody.innerHTML = `<p style="color: var(--error-color);">${error.message}</p>`;
         }
     });
 
-    projectModal.querySelector('#modal-body').addEventListener('click', async (e) => {
+    modalBody.addEventListener('click', async (e) => {
         const targetButton = e.target.closest('button.delete-btn');
         if (!targetButton) return;
         const repoName = targetButton.dataset.name;

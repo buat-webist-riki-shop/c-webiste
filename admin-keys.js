@@ -442,6 +442,7 @@ ${notes}`;
             button.textContent = 'Menambahkan...'; button.disabled = true;
             try {
                 const result = await callApi('addCloudflareZone', { domainName });
+                closeModal(cloudflareModal); // Tutup modal utama dulu
                 showCloudflareSuccessPopup(result);
                 input.value = '';
             } catch (error) {

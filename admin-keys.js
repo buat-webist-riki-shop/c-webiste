@@ -64,33 +64,11 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const showApiKeySuccessPopup = (newKey) => {
-        const formatDate = (isoString) => new Date(isoString).toLocaleString('id-ID', {
-            day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit'
-        });
+        const formatDate = (isoString) => new Date(isoString).toLocaleString('id-ID', { day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' });
         const expiryText = newKey.expires_at === 'permanent' ? 'Permanen' : formatDate(newKey.expires_at);
-        
-        apiKeyDetailsContainer.innerHTML = `
-            <div class="detail-item">
-                <span class="detail-label">Kunci API</span>
-                <span class="detail-value">${newKey.name}</span>
-            </div>
-            <div class="detail-item">
-                <span class="detail-label">Dibuat</span>
-                <span class="detail-value">${formatDate(newKey.created_at)}</span>
-            </div>
-            <div class="detail-item">
-                <span class="detail-label">Kadaluwarsa</span>
-                <span class="detail-value">${expiryText}</span>
-            </div>`;
+        apiKeyDetailsContainer.innerHTML = `<div class="detail-item"><span class="detail-label">Kunci API</span><span class="detail-value">${newKey.name}</span></div><div class="detail-item"><span class="detail-label">Dibuat</span><span class="detail-value">${formatDate(newKey.created_at)}</span></div><div class="detail-item"><span class="detail-label">Kadaluwarsa</span><span class="detail-value">${expiryText}</span></div>`;
         const notes = "Harap simpan detail kunci ini dengan baik. Informasi ini bersifat rahasia dan tidak akan ditampilkan lagi demi keamanan Anda.";
-        apiKeyTextToCopy = `Ini adalah data apikey anda
--------------------
-Apikey: ${newKey.name}
-Tanggal buat: ${formatDate(newKey.created_at)}
-Tanggal kadaluarsa: ${expiryText}
--------------------
-Notes:
-${notes}`;
+        apiKeyTextToCopy = `Ini adalah data apikey anda\n-------------------\nApikey: ${newKey.name}\nTanggal buat: ${formatDate(newKey.created_at)}\nTanggal kadaluarsa: ${expiryText}\n-------------------\nNotes:\n${notes}`;
         openModal(apiKeySuccessModal);
     };
 
@@ -111,9 +89,7 @@ ${notes}`;
     // === Fungsi Render Tampilan ===
     const renderApiKeys = (keys) => {
         keyListContainer.innerHTML = '';
-        if (Object.keys(keys).length === 0) {
-            keyListContainer.innerHTML = '<p>Belum ada API Key yang dibuat.</p>'; return;
-        }
+        if (Object.keys(keys).length === 0) { keyListContainer.innerHTML = '<p>Belum ada API Key yang dibuat.</p>'; return; }
         for (const key in keys) {
             const keyData = keys[key];
             const expiry = keyData.expires_at === 'permanent' ? 'Permanen' : `Kadaluwarsa: ${new Date(keyData.expires_at).toLocaleDateString('id-ID')}`;
@@ -126,28 +102,21 @@ ${notes}`;
 
     const renderProjects = (projects) => {
         modalBody.innerHTML = '';
-        if (projects.length === 0) {
-            modalBody.innerHTML = '<p>Tidak ada proyek/repositori yang ditemukan.</p>'; return;
-        }
+        if (projects.length === 0) { modalBody.innerHTML = '<p>Tidak ada proyek/repositori yang ditemukan.</p>'; return; }
+        let projectHtml = '';
         projects.forEach(proj => {
-            const item = document.createElement('div');
-            item.className = 'repo-item';
             const githubButton = proj.hasGithub ? `<button class="delete-btn delete-repo-btn" data-name="${proj.name}">Hapus Repo</button>` : '';
             const vercelButton = proj.hasVercel ? `<button class="delete-btn delete-vercel-btn" data-name="${proj.name}">Hapus Vercel</button>` : '';
             const repoInfo = proj.hasGithub ? `<a href="${proj.githubUrl}" target="_blank">${proj.name}</a><span>${proj.isPrivate ? 'Private' : 'Public'}</span>` : `<strong>${proj.name}</strong><span>(Hanya ada di Vercel)</span>`;
-            modalBody.innerHTML += `<div class="repo-item">${repoInfo}<div class="repo-actions">${githubButton}${vercelButton}</div></div>`;
+            projectHtml += `<div class="repo-item"><div class="item-info">${repoInfo}</div><div class="repo-actions">${githubButton}${vercelButton}</div></div>`;
         });
+        modalBody.innerHTML = `<ul class="list-item-container">${projectHtml}</ul>`;
     };
     
     // === Logika Cloudflare ===
     const showCloudflareSuccessPopup = (data) => {
         cfSuccessMessage.innerHTML = `Domain <strong>${data.domain}</strong> berhasil ditambahkan ke akun Cloudflare Anda.`;
-        cfNameserverList.innerHTML = data.nameservers.map(ns => `
-            <li class="nameserver-item">
-                <span>${ns}</span>
-                <button class="copy-ns-btn" data-ns="${ns}">Copy</button>
-            </li>
-        `).join('');
+        cfNameserverList.innerHTML = data.nameservers.map(ns => `<li class="nameserver-item"><span>${ns}</span><button class="copy-ns-btn" data-ns="${ns}">Copy</button></li>`).join('');
         openModal(cfSuccessModal);
     };
 
@@ -204,15 +173,15 @@ ${notes}`;
     const renderCloudflareZones = (zones) => {
         cloudflareModalTitle.textContent = 'Manajemen Zona Cloudflare';
         let listHtml = zones.map(zone => `
-            <li class="list-item">
+            <li class="list-item" data-search-term="${zone.name.toLowerCase()}">
                 <input type="checkbox" class="item-checkbox" value="${zone.id}" data-name="${zone.name}">
                 <div class="item-info">
                     <strong>${zone.name}</strong>
                     <span>Status: ${zone.status}</span>
                 </div>
                 <button class="manage-dns-btn" data-zone-id="${zone.id}" data-zone-name="${zone.name}">Kelola DNS</button>
-            </li>
-        `).join('');
+            </li>`).join('');
+
         cloudflareModalBody.innerHTML = `
             <div class="list-toolbar">
                 <form id="add-domain-form" class="add-domain-form">
@@ -221,33 +190,35 @@ ${notes}`;
                 </form>
             </div>
             <div class="list-toolbar">
-                <input type="checkbox" class="select-all-checkbox"> <span style="margin-left: -5px;">Pilih Semua</span>
-                <button class="bulk-delete-btn">Hapus Item Terpilih</button>
+                <input type="checkbox" class="select-all-checkbox" title="Pilih Semua">
+                <form class="search-form" style="margin-left: 10px;"><input type="search" id="zone-search-input" placeholder="Cari domain..."></form>
+                <button class="bulk-delete-btn">Hapus Terpilih</button>
             </div>
-            <ul class="list-item-container">${zones.length > 0 ? listHtml : '<li>Tidak ada zona ditemukan.</li>'}</ul>
-        `;
+            <ul class="list-item-container">${zones.length > 0 ? listHtml : '<li>Tidak ada zona ditemukan.</li>'}</ul>`;
         setupBulkDeleteControls(cloudflareModalBody, 'zones');
     };
 
     const renderDnsRecords = (records, zoneId, zoneName) => {
         cloudflareModalTitle.textContent = `Record DNS untuk ${zoneName}`;
-        let listHtml = records.map(rec => `
-            <li class="list-item">
+        let listHtml = records.map(rec => {
+            const searchTerm = `${rec.name} ${rec.type} ${rec.content}`.toLowerCase();
+            return `<li class="list-item" data-search-term="${searchTerm}">
                 <input type="checkbox" class="item-checkbox" value="${rec.id}" data-name="${rec.name}">
                 <div class="item-info">
                     <strong>${rec.name}</strong>
                     <span>${rec.type} &rarr; ${rec.content}</span>
                 </div>
-            </li>
-        `).join('');
+            </li>`;
+        }).join('');
+        
         cloudflareModalBody.innerHTML = `
             <div class="list-toolbar">
                  <button id="cloudflare-modal-back-btn">&larr; Kembali</button>
-                 <input type="checkbox" class="select-all-checkbox"> <span style="margin-left: -5px;">Pilih Semua</span>
-                 <button class="bulk-delete-btn">Hapus Item Terpilih</button>
+                 <input type="checkbox" class="select-all-checkbox" title="Pilih Semua">
+                 <form class="search-form" style="margin-left: 10px;"><input type="search" id="dns-search-input" placeholder="Cari record..."></form>
+                 <button class="bulk-delete-btn">Hapus Terpilih</button>
             </div>
-            <ul class="list-item-container">${records.length > 0 ? listHtml : '<li>Tidak ada record DNS.</li>'}</ul>
-        `;
+            <ul class="list-item-container">${records.length > 0 ? listHtml : '<li>Tidak ada record DNS.</li>'}</ul>`;
         cloudflareModalBody.querySelector('#cloudflare-modal-back-btn').onclick = () => manageDomainsBtn.click();
         setupBulkDeleteControls(cloudflareModalBody, 'dns', { zoneId, zoneName });
     };
@@ -422,8 +393,25 @@ ${notes}`;
         }
     });
 
+    cloudflareModalBody.addEventListener('input', (e) => {
+        const target = e.target;
+        if (target.matches('#zone-search-input, #dns-search-input')) {
+            const searchTerm = target.value.toLowerCase();
+            const listContainer = target.closest('#cloudflare-modal-body').querySelector('.list-item-container');
+            const items = listContainer.querySelectorAll('.list-item');
+            items.forEach(item => {
+                const itemSearchTerm = item.dataset.searchTerm || '';
+                item.style.display = itemSearchTerm.includes(searchTerm) ? 'flex' : 'none';
+            });
+        }
+    });
+
+    cloudflareModalBody.addEventListener('submit', (e) => {
+        if (e.target.matches('.search-form, #add-domain-form')) e.preventDefault();
+    });
+
     cloudflareModalBody.addEventListener('click', async (e) => {
-        if (e.target.closest('#add-domain-form')) {
+        if (e.target.closest('#add-domain-form button')) {
             e.preventDefault();
             const form = e.target.closest('#add-domain-form');
             const input = form.querySelector('#new-domain-name');
@@ -436,11 +424,8 @@ ${notes}`;
                 closeModal(cloudflareModal);
                 showCloudflareSuccessPopup(result);
                 input.value = '';
-            } catch (error) {
-                showNotification(error.message, 'error');
-            } finally {
-                button.textContent = 'Tambah'; button.disabled = false;
-            }
+            } catch (error) { showNotification(error.message, 'error');
+            } finally { button.textContent = 'Tambah'; button.disabled = false; }
         }
         if (e.target.classList.contains('manage-dns-btn')) {
             showDnsRecordsView(e.target.dataset.zoneId, e.target.dataset.zoneName);

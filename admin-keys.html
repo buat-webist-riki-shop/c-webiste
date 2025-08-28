@@ -67,67 +67,27 @@
         .notification.success { background-color: var(--success-color); }
         .notification.error { background-color: var(--error-color); }
         @keyframes slideInDown { to { opacity: 1; transform: translateY(0); } }
-        
-        /* --- PERBAIKAN TOTAL CSS MODAL --- */
-        .modal-overlay {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.6); z-index: 9998;
-            display: none; justify-content: center; align-items: center;
-            backdrop-filter: blur(5px);
-        }
-        .modal-content {
-            background: var(--card-bg); padding: 25px; border-radius: 20px;
-            width: 90%; max-width: 700px; position: relative;
-            max-height: 85vh; /* Batasi tinggi modal agar pas di layar */
-            display: flex; flex-direction: column; /* Layout vertikal */
-            box-shadow: var(--shadow);
-        }
-        .modal-close {
-            position: absolute; top: 15px; right: 15px;
-            background: none; border: none; font-size: 1.5em; cursor: pointer;
-            color: var(--text-muted); z-index: 10;
-        }
+        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 9998; display: none; justify-content: center; align-items: center; backdrop-filter: blur(5px); }
+        .modal-content { background: var(--card-bg); padding: 25px; border-radius: 20px; width: 90%; max-width: 700px; position: relative; max-height: 85vh; display: flex; flex-direction: column; box-shadow: var(--shadow); }
+        .modal-close { position: absolute; top: 15px; right: 15px; background: none; border: none; font-size: 1.5em; cursor: pointer; color: var(--text-muted); z-index: 10; }
         .modal-header { margin-bottom: 20px; flex-shrink: 0; }
-        #modal-body, #cloudflare-modal-body {
-            flex-grow: 1; /* Biarkan area ini memanjang */
-            overflow-y: auto; /* Tampilkan scroll HANYA jika kontennya panjang */
-            min-height: 0; /* Trik agar flexbox & overflow bekerja sempurna */
-        }
-        .list-toolbar {
-            display: flex; align-items: center; gap: 10px; padding-bottom: 15px;
-            margin-bottom: 15px; border-bottom: 1px solid var(--border-color);
-            flex-shrink: 0; flex-wrap: wrap;
-        }
-        .list-item-container { list-style-type: none; padding: 0; margin: 0; }
-        
-        /* --- PERBAIKAN POPUP DI BELAKANG (Z-INDEX) --- */
-        #confirmation-modal { z-index: 9999; }
-        #confirmation-modal .modal-content { max-width: 320px; text-align: center; padding: 0; overflow: hidden; display: block; }
-
-        /* Style item list (tetap sama, tapi lebih rapi) */
-        .repo-item, .list-item { padding: 15px; background: var(--bg-color); border-radius: 8px; margin-bottom: 10px; border: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
+        #modal-body, #cloudflare-modal-body { flex-grow: 1; overflow-y: auto; min-height: 0; }
+        .repo-item { padding: 15px; background: var(--bg-color); border-radius: 8px; margin-bottom: 10px; border: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; transition: opacity 0.3s; }
         .repo-info a { color: var(--primary-color); text-decoration: none; font-weight: 600; display: block; }
         .repo-info span { font-size: 0.8em; color: var(--text-muted); }
         .repo-actions button { font-size: 0.8em; padding: 6px 10px; }
         .repo-actions .delete-vercel-btn { background-color: var(--warn-color); }
-        .list-item input[type="checkbox"] { width: 18px; height: 18px; flex-shrink: 0; }
-        .item-info { flex-grow: 1; min-width: 0; }
-        .item-info strong { font-weight: 600; display: block; }
-        .item-info span { font-size: 0.85em; color: var(--text-muted); font-family: monospace; word-break: break-all; }
-        .add-domain-form { display: flex; gap: 10px; flex-grow: 1; }
-        .add-domain-form input { flex-grow: 1; }
-        #cloudflare-modal-back-btn { background-color: var(--text-muted); }
-        .bulk-delete-btn { background-color: var(--error-color); display: none; margin-left: auto; }
-        
-        /* Style modal-modal kecil lainnya (tidak berubah) */
+        #confirmation-modal { z-index: 9999; }
+        #confirmation-modal .modal-content, #apikey-success-modal .modal-content, #cf-success-modal .modal-content { display: block; max-height: none; }
+        #confirmation-modal .modal-content { max-width: 320px; text-align: center; padding: 0; overflow: hidden; }
         #confirmation-modal-title { font-size: 1.1em; font-weight: 600; padding: 20px 20px 5px; }
         #confirmation-modal-message { font-size: 0.9em; padding: 0 20px 20px; color: var(--text-muted); white-space: pre-wrap; }
         .confirmation-buttons { display: flex; border-top: 1px solid var(--border-color); }
         .confirmation-buttons button { flex: 1; padding: 14px; border-radius: 0; background: none; font-size: 1.05em; font-weight: 500; }
         #confirm-btn-no { color: var(--primary-color); border-right: 1px solid var(--border-color); }
         #confirm-btn-yes { color: var(--error-color); font-weight: 600; }
-        #apikey-success-modal .modal-content, #cf-success-modal .modal-content { display: block; max-height: none; max-width: 420px; text-align: center; padding: 0; overflow: hidden; }
-        #apikey-success-modal h3, #cf-success-modal h3 { font-size: 1.2em; font-weight: 600; padding: 25px 20px 10px; }
+        #apikey-success-modal .modal-content { max-width: 380px; text-align: center; padding: 0; overflow: hidden; }
+        #apikey-success-modal h3 { font-size: 1.2em; font-weight: 600; padding: 25px 20px 10px; }
         .apikey-details { padding: 0 25px; margin-bottom: 20px; text-align: left; }
         .detail-item { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--border-color); font-size: 0.9em; }
         .detail-item:last-child { border-bottom: none; }
@@ -139,6 +99,18 @@
         .apikey-success-footer button { flex: 1; padding: 15px; border-radius: 0; background: none; font-size: 1.05em; font-weight: 600; color: var(--primary-color); }
         #apikey-copy-btn { border-right: 1px solid var(--border-color); color: var(--primary-color); font-weight: 500; }
         #apikey-copy-btn i { margin-right: 6px; }
+        .list-item-container { list-style-type: none; padding: 0; margin: 0; }
+        .list-item { padding: 10px 15px; background: var(--bg-color); border-radius: 8px; margin-bottom: 10px; border: 1px solid var(--border-color); display: flex; align-items: center; gap: 15px; }
+        .list-item input[type="checkbox"] { width: 18px; height: 18px; flex-shrink: 0; }
+        .item-info { flex-grow: 1; min-width: 0; }
+        .item-info strong { font-weight: 600; display: block; }
+        .item-info span { font-size: 0.85em; color: var(--text-muted); font-family: monospace; word-break: break-all; }
+        .list-toolbar { display: flex; align-items: center; gap: 10px; padding-bottom: 15px; margin-bottom: 15px; border-bottom: 1px solid var(--border-color); flex-shrink: 0; flex-wrap: wrap; }
+        .add-domain-form, .search-form { display: flex; gap: 10px; flex-grow: 1; }
+        .add-domain-form input, .search-form input { flex-grow: 1; }
+        #cloudflare-modal-back-btn { background-color: var(--text-muted); }
+        .bulk-delete-btn { background-color: var(--error-color); display: none; margin-left: auto; }
+        #cf-success-modal .modal-content { max-width: 420px; text-align: center; padding: 0; overflow: hidden; }
         .nameserver-list { list-style-type: none; padding: 0; margin: 0 25px 20px; }
         .nameserver-item { display: flex; justify-content: space-between; align-items: center; padding: 10px; background-color: var(--bg-color); border-radius: 8px; margin-bottom: 8px; font-family: monospace; }
         .copy-ns-btn { font-size: 0.8em; padding: 4px 8px; background-color: var(--text-muted); }

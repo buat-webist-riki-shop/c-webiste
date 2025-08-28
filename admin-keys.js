@@ -19,10 +19,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const apiKeySuccessModal = document.getElementById('apikey-success-modal');
     const apiKeyDetailsContainer = document.getElementById('apikey-details-container');
     const apiKeySuccessOkBtn = document.getElementById('apikey-success-ok-btn');
-    // BARU: Elemen tombol copy
     const apiKeyCopyBtn = document.getElementById('apikey-copy-btn');
     
-    // Variabel untuk menyimpan teks yang akan di-copy
     let apiKeyTextToCopy = '';
 
     // === Logika Notifikasi Estetis ===
@@ -56,7 +54,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     };
 
-    // DIUBAH: Fungsi ini sekarang juga menyiapkan teks untuk di-copy
     const showApiKeySuccessPopup = (newKey) => {
         const formatDate = (isoString) => new Date(isoString).toLocaleString('id-ID', {
             day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit'
@@ -77,8 +74,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 <span class="detail-value">${expiryText}</span>
             </div>`;
 
-        // Siapkan teks untuk disalin
-        apiKeyTextToCopy = `Kunci API: ${newKey.name}\nDibuat Pada: ${formatDate(newKey.created_at)}\nKadaluwarsa Pada: ${expiryText}`;
+        const notes = "Harap simpan detail kunci ini dengan baik. Informasi ini bersifat rahasia dan tidak akan ditampilkan lagi demi keamanan Anda.";
+        apiKeyTextToCopy = `Ini adalah data apikey anda
+-------------------
+Apikey: ${newKey.name}
+Tanggal buat: ${formatDate(newKey.created_at)}
+Tanggal kadaluarsa: ${expiryText}
+-------------------
+Notes:
+${notes}`;
         
         openModal(apiKeySuccessModal);
     };
@@ -203,7 +207,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
     
-    // BARU: Event listener untuk tombol copy
     apiKeyCopyBtn.addEventListener('click', () => {
         navigator.clipboard.writeText(apiKeyTextToCopy).then(() => {
             apiKeyCopyBtn.innerHTML = '<i class="fas fa-check"></i> Tersalin!';

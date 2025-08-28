@@ -208,23 +208,63 @@ async function handleJsonActions(req, res) {
                 return res.status(200).json({ message: `Proyek Vercel '${projectName}' berhasil dihapus.` });
             }
             case "listAllCloudflareZones": {
-                const response = await fetch(`https://api.cloudflare.com/client/v4/zones`, { headers: CF_HEADERS });
-                const result = await response.json();
-                if (!result.success) throw new Error("Gagal mengambil daftar zona dari Cloudflare.");
-                return res.status(200).json(result.result);
+                let allZones = [];
+                let page = 1;
+                let totalPages = 1;
+                do {
+                    const response = await fetch(`https://api.cloudflare.com/client/v4/zones?page=${page}&per_page=50`, { headers: CF_HEADERS });
+                    const result = await response.json();
+                    if (!result.success) throw new Error("Gagal mengambil daftar zona dari Cloudflare.");
+                    allZones = allZones.concat(result.result);
+                    totalPages = result.result_info.total_pages;
+                    page++;
+                } while (page <= totalPages);
+                return res.status(200).json(allZones);
+            }
+            case "addCloudflareZone": {
+                const { domainName } = data;
+                if (!domainName) throw new Error("Nama domain diperlukan.");
+                const zonesResponse = await fetch(`https://api.cloudflare.com/client/v4/zones?per_page=1`, { headers: CF_HEADERS });
+                const zonesResult = await zonesResponse.json();
+                if (!zonesResult.success) throw new Error(zonesResult.errors[0]?.message || "Gagal memverifikasi akun Cloudflare.");
+                if (zonesResult.result.length === 0 && !process.env.CLOUDFLARE_ACCOUNT_ID) {
+                     throw new Error("Tidak dapat menemukan Account ID Cloudflare. Harap tambahkan CLOUDFLARE_ACCOUNT_ID di .env atau pastikan sudah ada minimal 1 domain di akun Anda.");
+                }
+                const accountId = process.env.CLOUDFLARE_ACCOUNT_ID || zonesResult.result[0].account.id;
+                const createResponse = await fetch(`https://api.cloudflare.com/client/v4/zones`, {
+                    method: 'POST',
+                    headers: CF_HEADERS,
+                    body: JSON.stringify({ name: domainName, account: { id: accountId } })
+                });
+                const createResult = await createResponse.json();
+                if (!createResult.success) {
+                    throw new Error(createResult.errors[0]?.message || "Gagal menambahkan domain ke Cloudflare.");
+                }
+                return res.status(200).json({
+                    message: `Domain ${domainName} berhasil ditambahkan.`,
+                    nameservers: createResult.result.name_servers,
+                    domain: createResult.result.name
+                });
             }
             case "listDnsRecords": {
                 const { zoneId } = data;
                 if (!zoneId) throw new Error("Zone ID diperlukan.");
-                const response = await fetch(`https://api.cloudflare.com/client/v4/zones/${zoneId}/dns_records`, { headers: CF_HEADERS });
-                const result = await response.json();
-                if (!result.success) throw new Error("Gagal mengambil data DNS dari Cloudflare.");
-                return res.status(200).json(result.result);
+                let allRecords = [];
+                let page = 1;
+                let totalPages = 1;
+                 do {
+                    const response = await fetch(`https://api.cloudflare.com/client/v4/zones/${zoneId}/dns_records?page=${page}&per_page=100`, { headers: CF_HEADERS });
+                    const result = await response.json();
+                    if (!result.success) throw new Error("Gagal mengambil data DNS dari Cloudflare.");
+                    allRecords = allRecords.concat(result.result);
+                    totalPages = result.result_info.total_pages;
+                    page++;
+                } while (page <= totalPages);
+                return res.status(200).json(allRecords);
             }
             case "bulkDeleteDnsRecords": {
                 const { zoneId, recordIds } = data;
                 if (!zoneId || !recordIds || recordIds.length === 0) throw new Error("Data tidak lengkap untuk hapus DNS.");
-                
                 let successCount = 0;
                 for (const recordId of recordIds) {
                     const response = await fetch(`https://api.cloudflare.com/client/v4/zones/${zoneId}/dns_records/${recordId}`, { method: 'DELETE', headers: CF_HEADERS });
@@ -235,7 +275,6 @@ async function handleJsonActions(req, res) {
             case "bulkDeleteCloudflareZones": {
                 const { zoneIds } = data;
                 if (!zoneIds || zoneIds.length === 0) throw new Error("Tidak ada zona yang dipilih untuk dihapus.");
-
                 let successCount = 0;
                 for (const zoneId of zoneIds) {
                     const response = await fetch(`https://api.cloudflare.com/client/v4/zones/${zoneId}`, { method: 'DELETE', headers: CF_HEADERS });

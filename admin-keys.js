@@ -17,8 +17,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const modalCloseBtn = document.getElementById('modal-close-btn');
     const modalTitle = document.getElementById('modal-title');
     const modalBody = document.getElementById('modal-body');
-    
-    // Elemen baru untuk modal konfirmasi
     const confirmationModal = document.getElementById('confirmation-modal');
     const confirmTitle = document.getElementById('confirmation-modal-title');
     const confirmMessage = document.getElementById('confirmation-modal-message');
@@ -37,34 +35,25 @@ document.addEventListener('DOMContentLoaded', () => {
     // === Logika Modal (Popup) ===
     const openModal = (modal) => modal.style.display = 'flex';
     const closeModal = (modal) => modal.style.display = 'none';
-
-    // Penutup modal utama
     modalCloseBtn.addEventListener('click', () => closeModal(projectModal));
     projectModal.addEventListener('click', (e) => {
         if (e.target === projectModal) closeModal(projectModal);
     });
     
-    // === BARU: Logika Popup Konfirmasi Estetis (Promise-based) ===
     const showConfirmation = (title, message) => {
         confirmTitle.textContent = title;
         confirmMessage.textContent = message;
         openModal(confirmationModal);
-
         return new Promise((resolve) => {
-            confirmBtnYes.onclick = () => {
-                closeModal(confirmationModal);
-                resolve(true);
-            };
-            confirmBtnNo.onclick = () => {
-                closeModal(confirmationModal);
-                resolve(false);
-            };
+            confirmBtnYes.onclick = () => { closeModal(confirmationModal); resolve(true); };
+            confirmBtnNo.onclick = () => { closeModal(confirmationModal); resolve(false); };
         });
     };
 
     // === Logika API ===
     const callApi = async (action, data = {}) => {
-        const password = sessionStorage.getItem('adminPassword');
+        // DIUBAH: Menggunakan localStorage untuk persistensi sesi
+        const password = localStorage.getItem('adminPassword'); 
         if (!password) {
             showNotification('Sesi admin tidak ditemukan. Harap login ulang.', 'error');
             throw new Error('Sesi admin tidak valid');
@@ -80,7 +69,6 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     // === Fungsi Render & Event Listener ===
-    // Fungsi untuk memuat API Key (tidak berubah)
     const loadApiKeys = async () => {
         keyListContainer.innerHTML = '<p>Memuat kunci...</p>';
         try {
@@ -136,14 +124,11 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // === DIUBAH TOTAL: Logika Hapus dengan UI Dinamis & Popup Estetis ===
     modalBody.addEventListener('click', async (e) => {
         const targetButton = e.target.closest('button.delete-btn');
         if (!targetButton) return;
-
         const repoName = targetButton.dataset.name;
         let action, title, message, originalText;
-
         if (targetButton.classList.contains('delete-repo-btn')) {
             action = 'deleteRepo';
             title = 'Hapus Repositori GitHub?';
@@ -154,24 +139,17 @@ document.addEventListener('DOMContentLoaded', () => {
             title = 'Hapus Proyek Vercel?';
             message = `Ini akan menghapus proyek '${repoName}' dari Vercel, termasuk semua deployment dan domain yang terhubung.`;
             originalText = 'Hapus Vercel';
-        } else {
-            return;
-        }
+        } else { return; }
         
         const confirmed = await showConfirmation(title, message);
-
         if (confirmed) {
             targetButton.textContent = 'Menghapus...';
             targetButton.disabled = true;
             try {
                 const result = await callApi(action, { repoName: repoName, projectName: repoName });
                 showNotification(result.message, 'success');
-                
-                // Logika UI Dinamis
                 const actionsContainer = targetButton.parentElement;
-                targetButton.remove(); // Hapus tombol yang diklik
-
-                // Jika sudah tidak ada tombol lain, hapus seluruh item dari daftar
+                targetButton.remove();
                 if (actionsContainer.children.length === 0) {
                     const repoItem = actionsContainer.parentElement;
                     repoItem.style.opacity = '0';
@@ -188,7 +166,9 @@ document.addEventListener('DOMContentLoaded', () => {
     loginBtn.addEventListener('click', async () => {
         const password = passwordInput.value;
         if (!password) return showNotification('Password tidak boleh kosong.', 'error');
-        sessionStorage.setItem('adminPassword', password);
+        // DIUBAH: Menyimpan ke localStorage
+        localStorage.setItem('adminPassword', password); 
+        
         try {
             loginBtn.textContent = 'Memverifikasi...';
             loginBtn.disabled = true;
@@ -198,7 +178,8 @@ document.addEventListener('DOMContentLoaded', () => {
             loadApiKeys();
         } catch (error) {
             showNotification(`Login Gagal: ${error.message}`, 'error');
-            sessionStorage.removeItem('adminPassword');
+            // DIUBAH: Menghapus dari localStorage jika gagal
+            localStorage.removeItem('adminPassword'); 
         } finally {
             loginBtn.textContent = 'Masuk';
             loginBtn.disabled = false;
@@ -208,12 +189,7 @@ document.addEventListener('DOMContentLoaded', () => {
     createKeyForm.addEventListener('submit', async (e) => {
         e.preventDefault();
         const keyNameInput = document.getElementById('new-apikey-name');
-        const data = {
-            key: keyNameInput.value.trim(),
-            duration: document.getElementById('new-apikey-duration').value,
-            unit: document.getElementById('new-apikey-unit').value,
-            isPermanent: permanentCheckbox.checked
-        };
+        const data = { key: keyNameInput.value.trim(), duration: document.getElementById('new-apikey-duration').value, unit: document.getElementById('new-apikey-unit').value, isPermanent: permanentCheckbox.checked };
         try {
             const result = await callApi('createApiKey', data);
             showNotification(result.message, 'success');
@@ -245,12 +221,10 @@ document.addEventListener('DOMContentLoaded', () => {
         durationSection.style.display = permanentCheckbox.checked ? 'none' : 'block';
     });
 
-    // === Inisialisasi Tema dan Aplikasi ===
     const init = () => {
         const savedTheme = localStorage.getItem('theme_preference_v1') || 'light';
         if (savedTheme === 'dark') { body.classList.add('dark-mode'); themeToggle.innerHTML = '<i class="fas fa-sun"></i>'; } 
         else { body.classList.remove('dark-mode'); themeToggle.innerHTML = '<i class="fas fa-moon"></i>'; }
-
         themeToggle.addEventListener('click', () => {
             const newTheme = body.classList.contains('dark-mode') ? 'light' : 'dark';
             localStorage.setItem('theme_preference_v1', newTheme);
@@ -259,10 +233,12 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         setTimeout(() => {
-            if (sessionStorage.getItem('adminPassword')) { loginBtn.click(); } 
+            // DIUBAH: Mengecek dari localStorage
+            if (localStorage.getItem('adminPassword')) { loginBtn.click(); } 
             else { loginScreen.style.display = 'block'; }
             loadingOverlay.classList.add('hidden');
         }, 500);
     };
+    
     init();
 });

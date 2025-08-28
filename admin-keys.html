@@ -24,7 +24,7 @@
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body {
             font-family: 'Poppins', sans-serif; background-color: var(--bg-color); color: var(--text-color);
-            display: flex; justify-content: center; align-items: center; /* DIUBAH: Konten ke tengah */
+            display: flex; justify-content: center; align-items: center;
             min-height: 100vh; padding: 20px;
             transition: background-color 0.3s, color 0.3s;
         }
@@ -61,12 +61,30 @@
         .loading-logo { font-size: 3em; color: var(--primary-color); margin-bottom: 20px; animation: pulse 1.5s infinite ease-in-out; }
         @keyframes pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.1); } }
         .theme-toggle { position: fixed; bottom: 20px; right: 20px; width: 50px; height: 50px; background-color: var(--card-bg); border: 1px solid var(--border-color); border-radius: 50%; display: flex; justify-content: center; align-items: center; font-size: 1.2em; cursor: pointer; box-shadow: 0 4px 12px rgba(0,0,0,0.1); z-index: 1001; }
-        .notification-container { position: fixed; top: 20px; right: 20px; z-index: 10002; width: 320px; }
-        .notification { padding: 15px; margin-bottom: 10px; border-radius: 8px; color: white; box-shadow: var(--shadow); opacity: 0; transform: translateX(100%); animation: slideIn 0.5s forwards; }
+        
+        /* --- DIUBAH: Style Notifikasi --- */
+        .notification-container {
+            position: fixed;
+            top: 20px;
+            left: 50%; /* Pindahkan ke tengah horizontal */
+            transform: translateX(-50%); /* Pastikan benar-benar di tengah */
+            z-index: 10002;
+            width: 90%;
+            max-width: 400px;
+        }
+        .notification {
+            padding: 15px; margin-bottom: 10px; border-radius: 8px; color: white;
+            box-shadow: var(--shadow); opacity: 0;
+            transform: translateY(-100%); /* Mulai dari atas */
+            animation: slideInDown 0.5s forwards;
+            text-align: center;
+        }
         .notification.success { background-color: var(--success-color); }
         .notification.error { background-color: var(--error-color); }
-        @keyframes slideIn { to { opacity: 1; transform: translateX(0); } }
-        
+        @keyframes slideInDown { /* Ubah nama animasi */
+            to { opacity: 1; transform: translateY(0); }
+        }
+
         /* -- Style Modal (Popup) Utama & Konfirmasi -- */
         .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 9998; display: none; justify-content: center; align-items: center; backdrop-filter: blur(5px); }
         .modal-content { background: var(--card-bg); padding: 30px; border-radius: 15px; width: 90%; max-width: 600px; position: relative; max-height: 80vh; overflow-y: auto; }
@@ -77,8 +95,6 @@
         .repo-info span { font-size: 0.8em; color: var(--text-muted); }
         .repo-actions button { font-size: 0.8em; padding: 6px 10px; }
         .repo-actions .delete-vercel-btn { background-color: var(--warn-color); }
-        
-        /* -- BARU: Style Popup Konfirmasi ala iPhone -- */
         #confirmation-modal .modal-content { max-width: 320px; text-align: center; padding: 0; overflow: hidden; }
         #confirmation-modal-title { font-size: 1.1em; font-weight: 600; padding: 20px 20px 5px; }
         #confirmation-modal-message { font-size: 0.9em; padding: 0 20px 20px; color: var(--text-muted); }

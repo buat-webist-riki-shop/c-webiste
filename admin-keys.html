@@ -68,7 +68,7 @@
         .notification.error { background-color: var(--error-color); }
         @keyframes slideInDown { to { opacity: 1; transform: translateY(0); } }
         .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 9998; display: none; justify-content: center; align-items: center; backdrop-filter: blur(5px); }
-        .modal-content { background: var(--card-bg); padding: 30px; border-radius: 15px; width: 90%; max-width: 600px; position: relative; max-height: 80vh; overflow-y: auto; }
+        .modal-content { background: var(--card-bg); padding: 30px; border-radius: 15px; width: 90%; max-width: 700px; position: relative; max-height: 80vh; overflow-y: auto; }
         .modal-close { position: absolute; top: 15px; right: 15px; background: none; border: none; font-size: 1.5em; cursor: pointer; color: var(--text-muted); }
         .modal-header { margin-bottom: 20px; }
         .repo-list .repo-item { padding: 15px; background: var(--bg-color); border-radius: 8px; margin-bottom: 10px; border: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; transition: opacity 0.3s; }
@@ -78,7 +78,7 @@
         .repo-actions .delete-vercel-btn { background-color: var(--warn-color); }
         #confirmation-modal .modal-content { max-width: 320px; text-align: center; padding: 0; overflow: hidden; }
         #confirmation-modal-title { font-size: 1.1em; font-weight: 600; padding: 20px 20px 5px; }
-        #confirmation-modal-message { font-size: 0.9em; padding: 0 20px 20px; color: var(--text-muted); }
+        #confirmation-modal-message { font-size: 0.9em; padding: 0 20px 20px; color: var(--text-muted); white-space: pre-wrap; }
         .confirmation-buttons { display: flex; border-top: 1px solid var(--border-color); }
         .confirmation-buttons button { flex: 1; padding: 14px; border-radius: 0; background: none; font-size: 1.05em; font-weight: 500; }
         #confirm-btn-no { color: var(--primary-color); border-right: 1px solid var(--border-color); }
@@ -96,6 +96,15 @@
         .apikey-success-footer button { flex: 1; padding: 15px; border-radius: 0; background: none; font-size: 1.05em; font-weight: 600; color: var(--primary-color); }
         #apikey-copy-btn { border-right: 1px solid var(--border-color); color: var(--primary-color); font-weight: 500; }
         #apikey-copy-btn i { margin-right: 6px; }
+        .list-item-container { list-style-type: none; padding: 0; margin: 0; max-height: 45vh; overflow-y: auto; }
+        .list-item { padding: 10px 15px; background: var(--bg-color); border-radius: 8px; margin-bottom: 10px; border: 1px solid var(--border-color); display: flex; align-items: center; gap: 15px; }
+        .list-item input[type="checkbox"] { width: 18px; height: 18px; flex-shrink: 0; }
+        .item-info { flex-grow: 1; }
+        .item-info strong { font-weight: 600; display: block; }
+        .item-info span { font-size: 0.85em; color: var(--text-muted); font-family: monospace; word-break: break-all; }
+        .list-toolbar { display: flex; align-items: center; gap: 15px; padding-bottom: 15px; margin-bottom: 15px; border-bottom: 1px solid var(--border-color); }
+        #cloudflare-modal-back-btn { background-color: var(--text-muted); }
+        .bulk-delete-btn { background-color: var(--error-color); display: none; margin-left: auto; }
     </style>
 </head>
 <body>
@@ -123,13 +132,16 @@
 
         <div class="section-header"><h2><i class="fab fa-github"></i> Manajemen Proyek</h2></div>
         <button id="manage-projects-btn" class="full-width"><i class="fas fa-tasks"></i> Tampilkan & Kelola Proyek</button>
+
+        <div class="section-header"><h2><i class="fas fa-cloud"></i> Manajemen Domain Cloudflare</h2></div>
+        <button id="manage-domains-btn" class="full-width"><i class="fas fa-network-wired"></i> Kelola Domain & DNS</button>
     </div>
     
     <div id="theme-toggle" class="theme-toggle"><i class="fas fa-moon"></i></div>
 
     <div id="project-modal" class="modal-overlay">
         <div class="modal-content">
-            <button id="modal-close-btn" class="modal-close">&times;</button>
+            <button class="modal-close">&times;</button>
             <div class="modal-header"><h2 id="modal-title">Daftar Repositori & Proyek</h2></div>
             <div id="modal-body" class="repo-list"></div>
         </div>
@@ -157,6 +169,16 @@
                 <button id="apikey-copy-btn"><i class="fas fa-copy"></i> Copy</button>
                 <button id="apikey-success-ok-btn">OK</button>
             </div>
+        </div>
+    </div>
+
+    <div id="cloudflare-modal" class="modal-overlay">
+        <div class="modal-content">
+            <button class="modal-close">&times;</button>
+            <div class="modal-header">
+                <h2 id="cloudflare-modal-title">Manajemen Domain</h2>
+            </div>
+            <div id="cloudflare-modal-body"></div>
         </div>
     </div>
 

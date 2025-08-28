@@ -9,7 +9,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const keyListContainer = document.getElementById('api-key-list-container');
     const manageProjectsBtn = document.getElementById('manage-projects-btn');
     const projectModal = document.getElementById('project-modal');
-    const modalCloseBtn = document.getElementById('modal-close-btn');
+    const modalCloseBtn = projectModal.querySelector('.modal-close');
     const modalBody = document.getElementById('modal-body');
     const confirmationModal = document.getElementById('confirmation-modal');
     const confirmTitle = document.getElementById('confirmation-modal-title');
@@ -20,6 +20,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const apiKeyDetailsContainer = document.getElementById('apikey-details-container');
     const apiKeySuccessOkBtn = document.getElementById('apikey-success-ok-btn');
     const apiKeyCopyBtn = document.getElementById('apikey-copy-btn');
+    const manageDomainsBtn = document.getElementById('manage-domains-btn');
+    const cloudflareModal = document.getElementById('cloudflare-modal');
+    const cloudflareModalTitle = document.getElementById('cloudflare-modal-title');
+    const cloudflareModalBody = document.getElementById('cloudflare-modal-body');
     
     let apiKeyTextToCopy = '';
 
@@ -43,6 +47,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const closeModal = (modal) => modal.style.display = 'none';
     modalCloseBtn.addEventListener('click', () => closeModal(projectModal));
     projectModal.addEventListener('click', (e) => { if (e.target === projectModal) closeModal(projectModal); });
+    cloudflareModal.querySelector('.modal-close').addEventListener('click', () => closeModal(cloudflareModal));
     
     const showConfirmation = (title, message) => {
         confirmTitle.textContent = title;
@@ -73,7 +78,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 <span class="detail-label">Kadaluwarsa</span>
                 <span class="detail-value">${expiryText}</span>
             </div>`;
-
         const notes = "Harap simpan detail kunci ini dengan baik. Informasi ini bersifat rahasia dan tidak akan ditampilkan lagi demi keamanan Anda.";
         apiKeyTextToCopy = `Ini adalah data apikey anda
 -------------------
@@ -83,7 +87,6 @@ Tanggal kadaluarsa: ${expiryText}
 -------------------
 Notes:
 ${notes}`;
-        
         openModal(apiKeySuccessModal);
     };
 
@@ -131,6 +134,121 @@ ${notes}`;
             item.innerHTML = `<div class="repo-info">${repoInfo}</div><div class="repo-actions">${githubButton}${vercelButton}</div>`;
             modalBody.appendChild(item);
         });
+    };
+    
+    // === Logika Cloudflare ===
+    const setupBulkDeleteControls = (container, listType, context) => {
+        const selectAllCheckbox = container.querySelector('.select-all-checkbox');
+        const checkboxes = container.querySelectorAll('.item-checkbox');
+        const bulkDeleteBtn = container.querySelector('.bulk-delete-btn');
+
+        const updateButtonVisibility = () => {
+            const checkedCount = container.querySelectorAll('.item-checkbox:checked').length;
+            bulkDeleteBtn.style.display = checkedCount > 0 ? 'inline-block' : 'none';
+            bulkDeleteBtn.textContent = `Hapus ${checkedCount} Item Terpilih`;
+        };
+
+        if(selectAllCheckbox) selectAllCheckbox.addEventListener('change', (e) => {
+            checkboxes.forEach(cb => cb.checked = e.target.checked);
+            updateButtonVisibility();
+        });
+
+        checkboxes.forEach(cb => cb.addEventListener('change', () => {
+            if(selectAllCheckbox) selectAllCheckbox.checked = [...checkboxes].every(c => c.checked);
+            updateButtonVisibility();
+        }));
+        
+        if(bulkDeleteBtn) bulkDeleteBtn.addEventListener('click', async () => {
+            const selectedItems = [...checkboxes].filter(cb => cb.checked);
+            const selectedIds = selectedItems.map(cb => cb.value);
+            const selectedNames = selectedItems.map(cb => cb.dataset.name);
+
+            let confirmed = false;
+            if (listType === 'zones') {
+                const confirmationMessage = `Anda akan MENGHAPUS PERMANEN ${selectedIds.length} zona berikut:\n\n${selectedNames.join('\n')}\n\nLanjutkan?`;
+                confirmed = await showConfirmation('KONFIRMASI HAPUS ZONA', confirmationMessage);
+            } else {
+                confirmed = await showConfirmation('Hapus Record DNS?', `Anda yakin ingin menghapus ${selectedIds.length} record DNS terpilih?`);
+            }
+
+            if (confirmed) {
+                bulkDeleteBtn.textContent = 'Menghapus...'; bulkDeleteBtn.disabled = true;
+                try {
+                    let result;
+                    if (listType === 'zones') {
+                        result = await callApi('bulkDeleteCloudflareZones', { zoneIds: selectedIds });
+                    } else { // dns
+                        result = await callApi('bulkDeleteDnsRecords', { zoneId: context.zoneId, recordIds: selectedIds });
+                    }
+                    showNotification(result.message, 'success');
+                    if (listType === 'zones') manageDomainsBtn.click();
+                    else showDnsRecordsView(context.zoneId, context.zoneName);
+                } catch (error) {
+                    showNotification(error.message, 'error');
+                } finally {
+                     bulkDeleteBtn.disabled = false;
+                     updateButtonVisibility();
+                }
+            }
+        });
+    };
+
+    const renderCloudflareZones = (zones) => {
+        cloudflareModalTitle.textContent = 'Manajemen Zona Cloudflare';
+        let listHtml = zones.map(zone => `
+            <li class="list-item">
+                <input type="checkbox" class="item-checkbox" value="${zone.id}" data-name="${zone.name}">
+                <div class="item-info">
+                    <strong>${zone.name}</strong>
+                    <span>Status: ${zone.status}</span>
+                </div>
+                <button class="manage-dns-btn" data-zone-id="${zone.id}" data-zone-name="${zone.name}">Kelola DNS</button>
+            </li>
+        `).join('');
+
+        cloudflareModalBody.innerHTML = `
+            <div class="list-toolbar">
+                <input type="checkbox" class="select-all-checkbox"> <span style="margin-left: -5px; margin-right: auto;">Pilih Semua</span>
+                <button class="bulk-delete-btn">Hapus Item Terpilih</button>
+            </div>
+            <ul class="list-item-container">${listHtml}</ul>
+        `;
+        setupBulkDeleteControls(cloudflareModalBody, 'zones');
+    };
+
+    const renderDnsRecords = (records, zoneId, zoneName) => {
+        cloudflareModalTitle.textContent = `Record DNS untuk ${zoneName}`;
+        let listHtml = records.map(rec => `
+            <li class="list-item">
+                <input type="checkbox" class="item-checkbox" value="${rec.id}" data-name="${rec.name}">
+                <div class="item-info">
+                    <strong>${rec.name}</strong>
+                    <span>${rec.type} &rarr; ${rec.content}</span>
+                </div>
+            </li>
+        `).join('');
+        
+        cloudflareModalBody.innerHTML = `
+            <div class="list-toolbar">
+                 <button id="cloudflare-modal-back-btn">&larr; Kembali</button>
+                 <input type="checkbox" class="select-all-checkbox"> <span style="margin-left: -5px; margin-right: auto;">Pilih Semua</span>
+                 <button class="bulk-delete-btn">Hapus Item Terpilih</button>
+            </div>
+            <ul class="list-item-container">${records.length > 0 ? listHtml : '<li>Tidak ada record DNS.</li>'}</ul>
+        `;
+        cloudflareModalBody.querySelector('#cloudflare-modal-back-btn').onclick = () => manageDomainsBtn.click();
+        setupBulkDeleteControls(cloudflareModalBody, 'dns', { zoneId, zoneName });
+    };
+
+    const showDnsRecordsView = async (zoneId, zoneName) => {
+        cloudflareModalBody.innerHTML = `<p>Memuat record DNS untuk ${zoneName}...</p>`;
+        try {
+            const records = await callApi('listDnsRecords', { zoneId });
+            renderDnsRecords(records, zoneId, zoneName);
+        } catch (error) {
+            showNotification(error.message, 'error');
+            manageDomainsBtn.click();
+        }
     };
     
     // === Fungsi Utama & Event Listener ===
@@ -262,6 +380,24 @@ ${notes}`;
                 showNotification(error.message, 'error');
                 targetButton.textContent = originalText; targetButton.disabled = false;
             }
+        }
+    });
+    
+    manageDomainsBtn.addEventListener('click', async () => {
+        cloudflareModalBody.innerHTML = '<p>Memuat zona dari Cloudflare...</p>';
+        openModal(cloudflareModal);
+        try {
+            const zones = await callApi('listAllCloudflareZones');
+            renderCloudflareZones(zones);
+        } catch (error) {
+            showNotification(error.message, 'error');
+            cloudflareModalBody.innerHTML = `<p style="color: var(--error-color);">Gagal memuat. Pastikan CLOUDFLARE_API_TOKEN sudah benar.</p>`;
+        }
+    });
+    
+    cloudflareModalBody.addEventListener('click', (e) => {
+        if (e.target.classList.contains('manage-dns-btn')) {
+            showDnsRecordsView(e.target.dataset.zoneId, e.target.dataset.zoneName);
         }
     });
 

@@ -14,11 +14,13 @@ const VERCEL_TEAM_ID = process.env.VERCEL_TEAM_ID;
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 const REPO_NAME_FOR_JSON = process.env.REPO_NAME_FOR_JSON;
 const VERCEL_A_RECORD = '76.76.21.21';
+const CLOUDFLARE_API_TOKEN = process.env.CLOUDFLARE_API_TOKEN;
 
 const octokit = new Octokit({ auth: GITHUB_TOKEN });
 const VERCEL_API_BASE = `https://api.vercel.com`;
 const VERCEL_HEADERS = { "Authorization": `Bearer ${VERCEL_TOKEN}`, "Content-Type": "application/json" };
 const TEAM_QUERY = VERCEL_TEAM_ID ? `?teamId=${VERCEL_TEAM_ID}` : '';
+const CF_HEADERS = { "Authorization": `Bearer ${CLOUDFLARE_API_TOKEN}`, "Content-Type": "application/json" };
 
 // --- Helper Functions ---
 async function readJsonFromGithub(filePath) {
@@ -205,11 +207,47 @@ async function handleJsonActions(req, res) {
                 }
                 return res.status(200).json({ message: `Proyek Vercel '${projectName}' berhasil dihapus.` });
             }
+            case "listAllCloudflareZones": {
+                const response = await fetch(`https://api.cloudflare.com/client/v4/zones`, { headers: CF_HEADERS });
+                const result = await response.json();
+                if (!result.success) throw new Error("Gagal mengambil daftar zona dari Cloudflare.");
+                return res.status(200).json(result.result);
+            }
+            case "listDnsRecords": {
+                const { zoneId } = data;
+                if (!zoneId) throw new Error("Zone ID diperlukan.");
+                const response = await fetch(`https://api.cloudflare.com/client/v4/zones/${zoneId}/dns_records`, { headers: CF_HEADERS });
+                const result = await response.json();
+                if (!result.success) throw new Error("Gagal mengambil data DNS dari Cloudflare.");
+                return res.status(200).json(result.result);
+            }
+            case "bulkDeleteDnsRecords": {
+                const { zoneId, recordIds } = data;
+                if (!zoneId || !recordIds || recordIds.length === 0) throw new Error("Data tidak lengkap untuk hapus DNS.");
+                
+                let successCount = 0;
+                for (const recordId of recordIds) {
+                    const response = await fetch(`https://api.cloudflare.com/client/v4/zones/${zoneId}/dns_records/${recordId}`, { method: 'DELETE', headers: CF_HEADERS });
+                    if (response.ok) successCount++;
+                }
+                return res.status(200).json({ message: `${successCount} dari ${recordIds.length} record DNS berhasil dihapus.` });
+            }
+            case "bulkDeleteCloudflareZones": {
+                const { zoneIds } = data;
+                if (!zoneIds || zoneIds.length === 0) throw new Error("Tidak ada zona yang dipilih untuk dihapus.");
+
+                let successCount = 0;
+                for (const zoneId of zoneIds) {
+                    const response = await fetch(`https://api.cloudflare.com/client/v4/zones/${zoneId}`, { method: 'DELETE', headers: CF_HEADERS });
+                    if (response.ok) successCount++;
+                }
+                return res.status(200).json({ message: `${successCount} dari ${zoneIds.length} zona berhasil dihapus.` });
+            }
             default:
                 return res.status(400).json({ message: "Aksi tidak dikenal." });
         }
     } catch (error) {
-        console.error("JSON Action Error:", error);
+        console.error("JSON Action Error:", error.message);
         return res.status(500).json({ message: error.message });
     }
 }

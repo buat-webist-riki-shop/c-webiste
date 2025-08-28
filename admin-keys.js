@@ -31,7 +31,13 @@ document.addEventListener('DOMContentLoaded', () => {
     
     let apiKeyTextToCopy = '';
 
-    // === Logika Notifikasi Estetis ===
+    // === Fungsi Bantuan & Logika Umum ===
+
+    // FUNGSI BARU: Untuk memformat tanggal dan jam secara konsisten
+    const formatFullDate = (isoString) => new Date(isoString).toLocaleString('id-ID', {
+        day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit'
+    });
+    
     let notificationTimeout;
     const showNotification = (message, type = 'success') => {
         clearTimeout(notificationTimeout);
@@ -46,7 +52,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }, 4000);
     };
 
-    // === Logika Modal (Popup) ===
     const openModal = (modal) => modal.style.display = 'flex';
     const closeModal = (modal) => modal.style.display = 'none';
     modalCloseBtn.addEventListener('click', () => closeModal(projectModal));
@@ -64,11 +69,30 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const showApiKeySuccessPopup = (newKey) => {
-        const formatDate = (isoString) => new Date(isoString).toLocaleString('id-ID', { day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' });
-        const expiryText = newKey.expires_at === 'permanent' ? 'Permanen' : formatDate(newKey.expires_at);
-        apiKeyDetailsContainer.innerHTML = `<div class="detail-item"><span class="detail-label">Kunci API</span><span class="detail-value">${newKey.name}</span></div><div class="detail-item"><span class="detail-label">Dibuat</span><span class="detail-value">${formatDate(newKey.created_at)}</span></div><div class="detail-item"><span class="detail-label">Kadaluwarsa</span><span class="detail-value">${expiryText}</span></div>`;
+        const expiryText = newKey.expires_at === 'permanent' ? 'Permanen' : formatFullDate(newKey.expires_at);
+        
+        apiKeyDetailsContainer.innerHTML = `
+            <div class="detail-item">
+                <span class="detail-label">Kunci API</span>
+                <span class="detail-value">${newKey.name}</span>
+            </div>
+            <div class="detail-item">
+                <span class="detail-label">Dibuat</span>
+                <span class="detail-value">${formatFullDate(newKey.created_at)}</span>
+            </div>
+            <div class="detail-item">
+                <span class="detail-label">Kadaluwarsa</span>
+                <span class="detail-value">${expiryText}</span>
+            </div>`;
         const notes = "Harap simpan detail kunci ini dengan baik. Informasi ini bersifat rahasia dan tidak akan ditampilkan lagi demi keamanan Anda.";
-        apiKeyTextToCopy = `Ini adalah data apikey anda\n-------------------\nApikey: ${newKey.name}\nTanggal buat: ${formatDate(newKey.created_at)}\nTanggal kadaluarsa: ${expiryText}\n-------------------\nNotes:\n${notes}`;
+        apiKeyTextToCopy = `Ini adalah data apikey anda
+-------------------
+Apikey: ${newKey.name}
+Tanggal buat: ${formatFullDate(newKey.created_at)}
+Tanggal kadaluarsa: ${expiryText}
+-------------------
+Notes:
+${notes}`;
         openModal(apiKeySuccessModal);
     };
 
@@ -92,7 +116,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (Object.keys(keys).length === 0) { keyListContainer.innerHTML = '<p>Belum ada API Key yang dibuat.</p>'; return; }
         for (const key in keys) {
             const keyData = keys[key];
-            const expiry = keyData.expires_at === 'permanent' ? 'Permanen' : `Kadaluwarsa: ${new Date(keyData.expires_at).toLocaleDateString('id-ID')}`;
+            // DIUBAH: Menggunakan formatFullDate untuk menampilkan jam
+            const expiry = keyData.expires_at === 'permanent' ? 'Permanen' : `Kadaluwarsa: ${formatFullDate(keyData.expires_at)}`;
             const item = document.createElement('div');
             item.className = 'key-item';
             item.innerHTML = `<div class="key-info"><span class="key-name">${key}</span><span class="key-expiry">${expiry}</span></div><button class="delete-btn" data-key="${key}"><i class="fas fa-trash-alt"></i></button>`;

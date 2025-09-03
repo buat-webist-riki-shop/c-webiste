@@ -28,9 +28,33 @@
             min-height: 100vh; padding: 20px;
             transition: background-color 0.3s, color 0.3s;
         }
+        .main-container { width: 100%; max-width: 700px; position: relative; margin-top: 50px; }
+        
+        .profile-picture-container {
+            position: absolute;
+            top: -50px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 10;
+        }
+        .profile-picture {
+            width: 100px;
+            height: 100px;
+            background-color: var(--card-bg);
+            border: 5px solid var(--bg-color);
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 3em;
+            color: var(--primary-color);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+
         .admin-card {
-            width: 100%; max-width: 700px; background: var(--card-bg); border: 1px solid var(--border-color);
-            border-radius: 20px; padding: 30px; box-shadow: var(--shadow);
+            width: 100%; background: var(--card-bg); border: 1px solid var(--border-color);
+            border-radius: 20px; padding: 25px; box-shadow: var(--shadow);
+            padding-top: 70px; /* Beri ruang untuk profil */
         }
         h1, h2 { font-weight: 600; }
         h1 { text-align: center; margin-bottom: 25px; }
@@ -47,8 +71,22 @@
         button:hover { opacity: 0.85; }
         button:disabled { opacity: 0.6; cursor: not-allowed; }
         button.full-width { width: 100%; font-size: 1.1em; padding: 14px; font-weight: 600; }
+        
         #admin-panel { display: none; }
-        .section-header { display: flex; justify-content: space-between; align-items: center; margin: 30px 0 15px; border-bottom: 1px solid var(--border-color); padding-bottom: 10px; }
+        .admin-nav {
+            display: flex; gap: 10px; margin-bottom: 25px;
+            padding-bottom: 15px; border-bottom: 1px solid var(--border-color); flex-wrap: wrap;
+        }
+        .nav-btn {
+            flex: 1 1 auto; background-color: var(--bg-color); color: var(--text-muted);
+            font-weight: 500; padding: 10px 15px; border: 1px solid var(--border-color);
+        }
+        .nav-btn.active { background-color: var(--primary-color); color: white; border-color: var(--primary-color); }
+        .admin-page { display: none; animation: fadeIn 0.4s; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+        .section-header { margin: 25px 0 15px; border-bottom: 1px solid var(--border-color); padding-bottom: 10px; }
+        .section-header:first-child { margin-top: 0; }
         .api-key-list .key-item { display: flex; justify-content: space-between; align-items: center; padding: 15px; background: var(--bg-color); border-radius: 8px; margin-bottom: 10px; border: 1px solid var(--border-color); }
         .key-info span { display: block; }
         .key-info .key-name { font-weight: 600; }
@@ -62,15 +100,23 @@
         .loading-logo { font-size: 3em; color: var(--primary-color); margin-bottom: 20px; animation: pulse 1.5s infinite ease-in-out; }
         @keyframes pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.1); } }
         .theme-toggle { position: fixed; bottom: 20px; right: 20px; width: 50px; height: 50px; background-color: var(--card-bg); border: 1px solid var(--border-color); border-radius: 50%; display: flex; justify-content: center; align-items: center; font-size: 1.2em; cursor: pointer; box-shadow: 0 4px 12px rgba(0,0,0,0.1); z-index: 1001; }
-        .notification-container { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); z-index: 10002; width: 90%; max-width: 400px; }
-        .notification { padding: 15px; margin-bottom: 10px; border-radius: 8px; color: white; box-shadow: var(--shadow); opacity: 0; transform: translateY(-100%); animation: slideInDown 0.5s forwards; text-align: center; transition: opacity 0.3s ease; }
-        .notification.success { background-color: var(--success-color); }
-        .notification.error { background-color: var(--error-color); }
+        
+        .notification-container { position: fixed; top: 15px; left: 0; width: 100%; z-index: 10002; display: flex; justify-content: center; pointer-events: none;}
+        .notification {
+            padding: 12px 20px; border-radius: 25px; color: #fff; box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            opacity: 0; transform: translateY(-150%); animation: slideInDown 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+            transition: opacity 0.4s ease; font-weight: 500; font-size: 0.9em;
+            background-color: rgba(40, 40, 40, 0.7); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+        }
+        .notification.success { background-color: rgba(48, 209, 88, 0.8); }
+        .notification.error { background-color: rgba(255, 69, 58, 0.8); }
         @keyframes slideInDown { to { opacity: 1; transform: translateY(0); } }
+
         .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 9998; display: none; justify-content: center; align-items: center; backdrop-filter: blur(5px); }
         .modal-content { background: var(--card-bg); padding: 25px; border-radius: 20px; width: 90%; max-width: 700px; position: relative; max-height: 85vh; display: flex; flex-direction: column; box-shadow: var(--shadow); }
         .modal-close { position: absolute; top: 15px; right: 15px; background: none; border: none; font-size: 1.5em; cursor: pointer; color: var(--text-muted); z-index: 10; }
         .modal-header { margin-bottom: 20px; flex-shrink: 0; }
+        .item-count { background-color: var(--bg-color); color: var(--text-muted); font-size: 0.7em; font-weight: 600; padding: 4px 8px; border-radius: 10px; margin-left: 8px; vertical-align: middle; }
         #modal-body, #cloudflare-modal-body { flex-grow: 1; overflow-y: auto; min-height: 0; }
         .repo-item { padding: 15px; background: var(--bg-color); border-radius: 8px; margin-bottom: 10px; border: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; transition: opacity 0.3s; }
         .repo-info a { color: var(--primary-color); text-decoration: none; font-weight: 600; display: block; }
@@ -114,85 +160,104 @@
         .nameserver-list { list-style-type: none; padding: 0; margin: 0 25px 20px; }
         .nameserver-item { display: flex; justify-content: space-between; align-items: center; padding: 10px; background-color: var(--bg-color); border-radius: 8px; margin-bottom: 8px; font-family: monospace; }
         .copy-ns-btn { font-size: 0.8em; padding: 4px 8px; background-color: var(--text-muted); }
+        /* [STYLE BARU DITAMBAHKAN DI SINI] */
+        .create-zone-token-btn {
+            background-color: var(--success-color);
+            font-size: 0.9em;
+            margin-left: 5px;
+            padding: 8px 10px;
+        }
     </style>
 </head>
 <body>
     <div id="loading-overlay" class="loading-overlay"><i class="fas fa-shield-alt loading-logo"></i><p>Memuat Panel Admin...</p></div>
     <div id="notification-container" class="notification-container"></div>
-    <div id="login-screen" class="admin-card" style="display: none;">
-        <h1><i class="fas fa-lock"></i> Admin Login</h1>
-        <div class="form-group"><label for="admin-password">Password Admin</label><input type="password" id="admin-password" placeholder="••••••••••"></div>
-        <button id="login-btn" class="full-width">Masuk</button>
-        <a href="index.html" class="back-link">Kembali ke Halaman Utama</a>
+    
+    <div class="main-container">
+        <div class="profile-picture-container">
+            <div class="profile-picture">
+                <i class="fas fa-user-shield"></i>
+            </div>
+        </div>
+
+        <div id="login-screen" class="admin-card" style="display: none;">
+            <h1><i class="fas fa-lock"></i> Admin Login</h1>
+            <div class="form-group"><label for="admin-password">Password Admin</label><input type="password" id="admin-password" placeholder="••••••••••"></div>
+            <button id="login-btn" class="full-width">Masuk</button>
+            <a href="index.html" class="back-link">Kembali ke Halaman Utama</a>
+        </div>
+
+        <div id="admin-panel" class="admin-card">
+            <nav class="admin-nav">
+                <button class="nav-btn active" data-page="page-settings"><i class="fas fa-store"></i> Pengaturan</button>
+                <button class="nav-btn" data-page="page-keys"><i class="fas fa-key"></i> API Keys</button>
+                <button class="nav-btn" data-page="page-projects"><i class="fas fa-tasks"></i> Proyek</button>
+                <button class="nav-btn" data-page="page-domains"><i class="fas fa-cloud"></i> Domain</button>
+            </nav>
+
+            <div class="admin-page" id="page-settings" style="display: block;">
+                <div class="section-header"><h2><i class="fas fa-store"></i> Pengaturan Harga & Kontak</h2></div>
+                <form id="settings-form">
+                    <div class="form-group"><label for="whatsapp-number">Nomor WhatsApp (Format: 628xxxxxxxx)</label><input type="text" id="whatsapp-number" placeholder="6281234567890"></div>
+                    <div class="form-group"><label for="normal-price">Harga Normal (contoh: 50000)</label><input type="number" id="normal-price" placeholder="50000"></div>
+                    <div class="form-group"><label for="discount-price">Harga Diskon (contoh: 25000)</label><input type="number" id="discount-price" placeholder="25000"></div>
+                    <div class="form-group"><label for="discount-end-date">Tanggal Berakhir Diskon</label><input type="datetime-local" id="discount-end-date"></div>
+                    <button type="submit" class="full-width">Simpan Pengaturan</button>
+                </form>
+            </div>
+
+            <div class="admin-page" id="page-keys">
+                <div class="section-header"><h2><i class="fas fa-key"></i> Buat API Key Baru</h2></div>
+                <form id="create-key-form">
+                    <div class="form-group"><label for="new-apikey-name">Nama Key</label><input type="text" id="new-apikey-name" placeholder="Contoh: KunciPremium-Andi" required></div>
+                    <div id="duration-section"><label>Durasi Aktif</label><div class="duration-group"><input type="number" id="new-apikey-duration" value="7" style="flex-grow: 1;"><select id="new-apikey-unit" style="flex-grow: 2;"><option value="days">Hari</option><option value="weeks">Minggu</option><option value="months">Bulan</option></select></div></div>
+                    <div class="permanent-toggle form-group"><input type="checkbox" id="permanent-key" style="width: auto;"><label for="permanent-key" style="margin: 0;">Buat Jadi Permanen</label></div>
+                    <button type="submit" class="full-width">Buat Kunci</button>
+                </form>
+                <div class="section-header"><h2><i class="fas fa-list-ul"></i> Daftar API Key Aktif</h2></div>
+                <div class="api-key-list" id="api-key-list-container"><p>Memuat kunci...</p></div>
+            </div>
+
+            <div class="admin-page" id="page-projects">
+                <div class="section-header"><h2><i class="fab fa-github"></i> Manajemen Proyek</h2></div>
+                <p>Kelola semua repositori GitHub dan proyek Vercel yang telah dibuat melalui sistem ini.</p>
+                <button id="manage-projects-btn" class="full-width" style="margin-top: 15px;"><i class="fas fa-folder-open"></i> Tampilkan & Kelola Proyek</button>
+            </div>
+            
+            <div class="admin-page" id="page-domains">
+                <div class="section-header"><h2><i class="fas fa-cloud"></i> Manajemen Domain Cloudflare</h2></div>
+                <p>Tambahkan domain baru ke akun Cloudflare Anda atau kelola record DNS dari domain yang sudah ada.</p>
+                <button id="manage-domains-btn" class="full-width" style="margin-top: 15px;"><i class="fas fa-network-wired"></i> Kelola Domain & DNS</button>
+            </div>
+
+            <button id="logout-btn" class="full-width" style="background-color: var(--error-color); margin-top: 30px;"><i class="fas fa-sign-out-alt"></i> Logout</button>
+        </div>
     </div>
-    <div id="admin-panel" class="admin-card" style="display: none;">
-        <div class="section-header"><h2><i class="fas fa-key"></i> Buat API Key Baru</h2></div>
-        <form id="create-key-form">
-            <div class="form-group"><label for="new-apikey-name">Nama Key</label><input type="text" id="new-apikey-name" placeholder="Contoh: KunciPremium-Andi" required></div>
-            <div id="duration-section"><label>Durasi Aktif</label><div class="duration-group"><input type="number" id="new-apikey-duration" value="7" style="flex-grow: 1;"><select id="new-apikey-unit" style="flex-grow: 2;"><option value="days">Hari</option><option value="weeks">Minggu</option><option value="months">Bulan</option></select></div></div>
-            <div class="permanent-toggle form-group"><input type="checkbox" id="permanent-key" style="width: auto;"><label for="permanent-key" style="margin: 0;">Buat Jadi Permanen</label></div>
-            <button type="submit" class="full-width">Buat Kunci</button>
-        </form>
-        <div class="section-header"><h2><i class="fas fa-list-ul"></i> Daftar API Key Aktif</h2></div>
-        <div class="api-key-list" id="api-key-list-container"></div>
-        <div class="section-header"><h2><i class="fab fa-github"></i> Manajemen Proyek</h2></div>
-        <button id="manage-projects-btn" class="full-width"><i class="fas fa-tasks"></i> Tampilkan & Kelola Proyek</button>
-        <div class="section-header"><h2><i class="fas fa-cloud"></i> Manajemen Domain Cloudflare</h2></div>
-        <button id="manage-domains-btn" class="full-width"><i class="fas fa-network-wired"></i> Kelola Domain & DNS</button>
-    </div>
+    
     <div id="theme-toggle" class="theme-toggle"><i class="fas fa-moon"></i></div>
-    <div id="project-modal" class="modal-overlay">
-        <div class="modal-content">
-            <button class="modal-close">&times;</button>
-            <div class="modal-header"><h2 id="modal-title">Daftar Repositori & Proyek</h2></div>
-            <div id="modal-body"></div>
-        </div>
-    </div>
-    <div id="confirmation-modal" class="modal-overlay">
-        <div class="modal-content">
-            <h3 id="confirmation-modal-title">Konfirmasi Tindakan</h3>
-            <p id="confirmation-modal-message">Apakah Anda yakin?</p>
-            <div class="confirmation-buttons">
-                <button id="confirm-btn-no">Batal</button>
-                <button id="confirm-btn-yes">Hapus</button>
-            </div>
-        </div>
-    </div>
-    <div id="apikey-success-modal" class="modal-overlay">
-        <div class="modal-content">
-            <h3><i class="fas fa-check-circle" style="color: var(--success-color);"></i> Kunci Berhasil Dibuat!</h3>
-            <div class="apikey-details" id="apikey-details-container"></div>
-            <div class="apikey-info-box">
-                <p><i class="fas fa-info-circle"></i> Harap salin dan simpan Kunci API Anda di tempat yang aman. Anda tidak akan bisa melihatnya lagi setelah ini.</p>
+    
+    <div id="project-modal" class="modal-overlay"><div class="modal-content"><button class="modal-close">&times;</button><div class="modal-header"><h2 id="modal-title">Daftar Repositori & Proyek</h2></div><div id="modal-body"></div></div></div>
+    <div id="confirmation-modal" class="modal-overlay"><div class="modal-content"><h3 id="confirmation-modal-title">Konfirmasi Tindakan</h3><p id="confirmation-modal-message">Apakah Anda yakin?</p><div class="confirmation-buttons"><button id="confirm-btn-no">Batal</button><button id="confirm-btn-yes">Hapus</button></div></div></div>
+    <div id="apikey-success-modal" class="modal-overlay"><div class="modal-content"><h3><i class="fas fa-check-circle" style="color: var(--success-color);"></i> Kunci Berhasil Dibuat!</h3><div class="apikey-details" id="apikey-details-container"></div><div class="apikey-info-box"><p><i class="fas fa-info-circle"></i> Harap salin dan simpan Kunci API Anda di tempat yang aman. Anda tidak akan bisa melihatnya lagi setelah ini.</p></div><div class="apikey-success-footer"><button id="apikey-copy-btn"><i class="fas fa-copy"></i> Copy</button><button id="apikey-success-ok-btn">OK</button></div></div></div>
+    <div id="cloudflare-modal" class="modal-overlay"><div class="modal-content"><button class="modal-close">&times;</button><div class="modal-header"><h2 id="cloudflare-modal-title">Manajemen Domain</h2></div><div id="cloudflare-modal-body"></div></div></div>
+    <div id="cf-success-modal" class="modal-overlay"><div class="modal-content"><h3><i class="fas fa-check-circle" style="color: var(--success-color);"></i> Domain Ditambahkan!</h3><div class="apikey-info-box" style="text-align: left;"><p id="cf-success-message"></p></div><ul class="nameserver-list" id="cf-nameserver-list"></ul><div class="apikey-info-box"><p><i class="fas fa-info-circle"></i> Segera perbarui nameserver di registrar domain Anda dengan data di atas.</p></div><div class="apikey-success-footer"><button id="cf-success-ok-btn">Selesai</button></div></div></div>
+    
+    <div id="zone-token-success-modal" class="modal-overlay">
+        <div class="modal-content" style="max-width: 420px; text-align: center;">
+            <h3><i class="fas fa-check-circle" style="color: var(--success-color);"></i> Token Berhasil Dibuat!</h3>
+            <p style="padding: 0 20px 20px; color: var(--text-muted); font-size: 0.9em;">
+                API Token khusus untuk domain <strong id="zone-token-name"></strong> telah dibuat dan disimpan.
+            </p>
+            <div class="apikey-info-box" style="margin: 0 25px 25px; text-align: left;">
+                <code id="zone-token-value" style="word-break: break-all;"></code>
             </div>
             <div class="apikey-success-footer">
-                <button id="apikey-copy-btn"><i class="fas fa-copy"></i> Copy</button>
-                <button id="apikey-success-ok-btn">OK</button>
+                <button id="zone-token-copy-btn"><i class="fas fa-copy"></i> Copy Token</button>
+                <button id="zone-token-ok-btn">Selesai</button>
             </div>
         </div>
     </div>
-    <div id="cloudflare-modal" class="modal-overlay">
-        <div class="modal-content">
-            <button class="modal-close">&times;</button>
-            <div class="modal-header"><h2 id="cloudflare-modal-title">Manajemen Domain</h2></div>
-            <div id="cloudflare-modal-body"></div>
-        </div>
-    </div>
-    <div id="cf-success-modal" class="modal-overlay">
-        <div class="modal-content">
-            <h3><i class="fas fa-check-circle" style="color: var(--success-color);"></i> Domain Ditambahkan!</h3>
-            <div class="apikey-info-box" style="text-align: left;">
-                <p id="cf-success-message"></p>
-            </div>
-            <ul class="nameserver-list" id="cf-nameserver-list"></ul>
-            <div class="apikey-info-box">
-                <p><i class="fas fa-info-circle"></i> Segera perbarui nameserver di registrar domain Anda dengan data di atas.</p>
-            </div>
-            <div class="apikey-success-footer">
-                <button id="cf-success-ok-btn">Selesai</button>
-            </div>
-        </div>
-    </div>
+
     <script src="admin-keys.js"></script>
 </body>
 </html>

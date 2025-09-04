@@ -28,6 +28,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const cfSuccessMessage = document.getElementById('cf-success-message');
     const cfNameserverList = document.getElementById('cf-nameserver-list');
     const cfSuccessOkBtn = document.getElementById('cf-success-ok-btn');
+    // Tambahkan ini di daftar elemen UI
+const zoneIdModal = document.getElementById('zone-id-modal');
+const zoneIdDomainName = document.getElementById('zone-id-domain-name');
+const zoneIdValue = document.getElementById('zone-id-value');
+const zoneIdCopyBtn = document.getElementById('zone-id-copy-btn');
+const zoneIdOkBtn = document.getElementById('zone-id-ok-btn');
     
     const settingsForm = document.getElementById('settings-form');
     const waInput = document.getElementById('whatsapp-number');
@@ -203,16 +209,25 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const renderCloudflareZones = (zones, container) => {
-        cloudflareModalTitle.innerHTML = `Manajemen Zona Cloudflare <span class="item-count">${zones.length}</span>`;
-        let listHtml = zones.map(zone => `
-        <li class="list-item" data-search-term="${zone.name.toLowerCase()}">
+    cloudflareModalTitle.innerHTML = `Manajemen Zona Cloudflare <span class="item-count">${zones.length}</span>`;
+    let listHtml = zones.map(zone => {
+        const searchTerm = `${zone.name.toLowerCase()} ${zone.id}`;
+        // [MODIFIKASI] Teks ID dibungkus dengan <span> yang bisa diklik
+        return `
+        <li class="list-item" data-search-term="${searchTerm}">
             <input type="checkbox" class="item-checkbox" value="${zone.id}" data-name="${zone.name}">
-            <div class="item-info"><strong>${zone.name}</strong><span>Status: ${zone.status}</span></div>
+            <div class="item-info">
+                <strong>${zone.name}</strong>
+                <span>
+                    ID: <span class="zone-id-clickable" data-zone-id="${zone.id}" data-zone-name="${zone.name}" title="Salin Zone ID">${zone.id}</span> | Status: ${zone.status}
+                </span>
+            </div>
             <button class="manage-dns-btn" data-zone-id="${zone.id}" data-zone-name="${zone.name}">Kelola DNS</button>
-        </li>`).join('');
-        container.innerHTML = `<div class="list-toolbar"><form id="add-cf-zone-form" class="add-domain-form"><input type="text" id="new-cf-domain-name" placeholder="Masukkan domain baru..." required><button type="submit">Tambah ke Cloudflare</button></form></div><div class="list-toolbar"><input type="checkbox" class="select-all-checkbox" title="Pilih Semua"><form class="search-form" style="margin-left: 10px;"><input type="search" id="zone-search-input" placeholder="Cari domain..."></form><button class="bulk-delete-btn">Hapus Terpilih</button></div><ul class="list-item-container">${zones.length > 0 ? listHtml : '<li>Tidak ada zona ditemukan di akun Cloudflare.</li>'}</ul>`;
-        setupBulkDeleteControls(container, 'zones');
-    };
+        </li>`;
+    }).join('');
+    container.innerHTML = `<div class="list-toolbar"><form id="add-cf-zone-form" class="add-domain-form"><input type="text" id="new-cf-domain-name" placeholder="Masukkan domain baru..." required><button type="submit">Tambah ke Cloudflare</button></form></div><div class="list-toolbar"><input type="checkbox" class="select-all-checkbox" title="Pilih Semua"><form class="search-form" style="margin-left: 10px;"><input type="search" id="zone-search-input" placeholder="Cari domain atau Zone ID..."></form><button class="bulk-delete-btn">Hapus Terpilih</button></div><ul class="list-item-container">${zones.length > 0 ? listHtml : '<li>Tidak ada zona ditemukan di akun Cloudflare.</li>'}</ul>`;
+    setupBulkDeleteControls(container, 'zones');
+};
     
     const renderDnsRecords = (records, zoneId, zoneName) => {
         const container = document.getElementById('domain-view-container');
@@ -481,6 +496,37 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }
     });
+    
+    // --- Event Listener untuk Modal Zone ID ---
+
+cloudflareModalBody.addEventListener('click', (e) => {
+    if (e.target.classList.contains('zone-id-clickable')) {
+        const zoneId = e.target.dataset.zoneId;
+        const zoneName = e.target.dataset.zoneName;
+
+        zoneIdDomainName.innerHTML = `Ini adalah Zone ID untuk domain <strong>${zoneName}</strong>.`;
+        zoneIdValue.textContent = zoneId;
+
+        // Simpan ID ke variabel sementara untuk fungsi copy
+        zoneIdCopyBtn.dataset.zoneIdToCopy = zoneId;
+
+        openModal(zoneIdModal);
+    }
+});
+
+zoneIdCopyBtn.addEventListener('click', () => {
+    const idToCopy = zoneIdCopyBtn.dataset.zoneIdToCopy;
+    navigator.clipboard.writeText(idToCopy).then(() => {
+        zoneIdCopyBtn.innerHTML = '<i class="fas fa-check"></i> Tersalin!';
+        setTimeout(() => {
+            zoneIdCopyBtn.innerHTML = '<i class="fas fa-copy"></i> Copy ID';
+        }, 2000);
+    });
+});
+
+zoneIdOkBtn.addEventListener('click', () => {
+    closeModal(zoneIdModal);
+});
 
     cloudflareModalBody.addEventListener('submit', async (e) => {
         e.preventDefault();

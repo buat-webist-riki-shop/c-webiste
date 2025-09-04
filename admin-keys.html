@@ -2,7 +2,7 @@
 <html lang="id">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0">
     <title>Admin - Manajemen Lanjutan</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -167,6 +167,17 @@
             margin-left: 5px;
             padding: 8px 10px;
         }
+        
+        .zone-id-clickable {
+    cursor: pointer;
+    color: var(--primary-color);
+    text-decoration: underline;
+    text-decoration-style: dotted;
+    font-weight: 500;
+}
+.zone-id-clickable:hover {
+    text-decoration-style: solid;
+}
     </style>
 </head>
 <body>
@@ -257,6 +268,22 @@
             </div>
         </div>
     </div>
+    
+    <div id="zone-id-modal" class="modal-overlay">
+    <div class="modal-content" style="max-width: 420px; text-align: center;">
+        <h3><i class="fas fa-fingerprint" style="color: var(--primary-color);"></i> Zone ID Details</h3>
+        <p id="zone-id-domain-name" style="padding: 0 20px 10px; color: var(--text-muted); font-size: 0.9em;">
+            Ini adalah Zone ID untuk domain Anda.
+        </p>
+        <div class="apikey-info-box" style="margin: 0 25px 25px; text-align: left; background-color: var(--bg-color); border: 1px solid var(--border-color); padding: 15px; border-radius: 10px;">
+            <code id="zone-id-value" style="word-break: break-all; font-family: monospace; font-size: 1.1em;"></code>
+        </div>
+        <div class="apikey-success-footer">
+            <button id="zone-id-copy-btn"><i class="fas fa-copy"></i> Copy ID</button>
+            <button id="zone-id-ok-btn">Selesai</button>
+        </div>
+    </div>
+</div>
 
     <script src="admin-keys.js"></script>
 </body>
